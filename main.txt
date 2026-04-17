@@ -1,0 +1,69 @@
+nel main in:  
+
+prepare_datasets(config, logger)     
+
+train_dataset = SupervisedEEGDataset(eeg_data['train'])
+test_dataset = SupervisedEEGDataset(eeg_data['test'])
+
+dove train e test gia divisi prima (85% e 15%)
+
+poi:
+
+train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS)
+test_loader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=False, num_workers=NUM_WORKERS)
+
+in train c'è shuffle quindi a ogni epoca lo rimischia, in test non lo fa 
+funzione che prepara i dati per il modello
+
+
+
+
+pretrain_contrastive_model(config, eeg_data, device, logger, tensorboard_logger):
+
+    train_contrastive_dataset = ContrastiveEEGDataset(eeg_data['train'], augmentations=augmentations)
+
+per il training usa il dataset di train
+
+    val_contrastive_dataset = ContrastiveEEGDataset(eeg_data['test'], augmentations=augmentations)
+
+per validation usa i 3 soggetti da test
+
+
+
+
+train_supervised_classifier(config, encoder, train_loader, test_loader, device, logger, tensorboard_logger):
+
+    for param in encoder.parameters():
+        param.requires_grad = False
+    logger.info("Encoder frozen")
+
+encoder congelato
+
+    train_classifier(
+        encoder=encoder,
+        classifier=classifier,
+        train_loader=train_loader,
+        val_loader=test_loader,  
+        criterion=criterion,
+        optimizer=supervised_optimizer,
+        num_epochs=config["sup_training_params"]["max_epochs"],
+        device=device,
+        save_path=best_classifier_pth,
+        check_interval=config["sup_training_params"]["check_interval"],
+        min_improvement=config["sup_training_params"]["min_improvement"]
+    )
+    logger.info("Classifier training complete")
+
+train_loader=train_loader : ridanno per fine tuning nuovamente il dataset di train 
+val_loader=test_loader    : per validation qui usano sempre il test usato anche come validatin in training    
+
+
+
+
+test_and_save_results(config, encoder, classifier, test_loader, device, logger):
+
+usa i dati di test (i 3 soggetti sempre quelli)
+
+
+
+il test e train sono generati una volta all'inizio quando si lancia il modello poi quelli rimangono

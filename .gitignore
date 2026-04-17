@@ -1,0 +1,31 @@
+# Ambiente
+venv_ford/
+venv_sleepnet/
+venv/
+__pycache__/
+*.pyc
+
+# Dati (escludi TUTTO)
+data/
+dset/
+*.npz
+*.npy
+*.zip
+
+# Checkpoint e log
+checkpoints/
+logs/
+runs/
+results/
+
+# File nascosti
+.DS_Store
+*.log
+
+# Report pesanti
+report/*.pdf
+report/*.zip
+
+# Dati
+data/*.npz
+data/*.npy

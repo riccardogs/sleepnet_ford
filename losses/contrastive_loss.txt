@@ -1,0 +1,460 @@
+CONTRASTIVE LOSS - NT-Xent (Normalized Temperature-scaled Cross Entropy Loss)
+
+Ha l'obbeiettivo di avvicinare embeddings di due views AUGMENTATE dello stesso segnale (positive pair)
+e di allontanare embeddings di segnali diversi (negative pairs)
+
+
+cioe:
+
+cosa si intende per "avvicinare"?
+- Vuol dire che la distanza tra due embeddings (vettori) deve essere piccola
+- La similarità coseno deve essere alta (vicina a 1)
+- Nello spazio vettoriale, i due punti devono essere vicini
+
+cosa si intende per "allontanare"?
+- La distanza tra embeddings deve essere grande
+- La similarità coseno deve essere bassa (vicina a 0 o negativa)
+- Nello spazio vettoriale, i due punti devono essere lontani
+
+
+
+ESEMPIO CONCRETO CON SEGNALI EEG:
+
+Hai 3 segnali EEG:
+- Segnale A: sonno profondo (N3) di un paziente
+- Segnale B: sonno REM dello stesso paziente
+- Segnale C: sonno profondo (N3) di un altro paziente
+
+Applicando una augmentation (es. TimeWarping) a ogni segnale:
+- A genera A1 e A2 (due versioni leggermente diverse dello stesso segnale)
+- B genera B1 e B2
+- C genera C1 e C2
+
+COSA VUOLE IL MODELLO:
+- A1 deve essere simile ad A2 (positive pair) - stesso segnale
+- B1 deve essere simile a B2 (positive pair) - stesso segnale
+- C1 deve essere simile a C2 (positive pair) - stesso segnale
+
+- A1 deve essere diverso da B1, B2, C1, C2 (negative pairs)
+- A2 deve essere diverso da B1, B2, C1, C2
+- B1 deve essere diverso da A1, A2, C1, C2
+- E così via...
+
+
+PERCHÉ QUESTO È UTILE?
+
+Il modello impara che:
+- Le trasformazioni (augmentations) non cambiano l'identità del segnale
+- Due segnali diversi (anche dello stesso stadio del sonno) sono distinti
+- Impara rappresentazioni INVARIANTI rispetto a trasformazioni irrilevanti
+
+
+
+
+
+ESEMPIO NUMERICO
+
+COSA SONO GLI EMBEDDINGS?
+
+Sono vettori di numeri che rappresentano un segnale EEG.
+Esempio con 2 dimensioni: [0.5, 0.8] (un punto su un piano)
+
+SEGNALI DI PARTENZA:
+
+Abbiamo 2 segnali EEG originali:
+- Segnale A: un epoch di sonno profondo (N3)
+- Segnale B: un epoch di sonno REM
+
+Da ogni segnale generiamo 2 views augmentate (leggermente modificate):
+- A1 e A2 (due versioni dello stesso segnale A)
+- B1 e B2 (due versioni dello stesso segnale B)
+
+
+----
+NOTA: le views sono sempre 2 indipendentemente dal numero delle augumantation:
+
+Esempio con 2 augmentations (TimeWarping + RandomNoise):
+
+- View 1 = TimeWarping( RandomNoise( segnale originale ) )
+- View 2 = TimeWarping( RandomNoise( segnale originale ) )
+
+Le augmentazioni si applicano IN CASCATA (prima una, poi l'altra) su CIASCUNA view.
+----
+
+
+PRIMA DEL TRAINING (pesi casuali del modello):
+
+I embeddings sono messi a caso nello spazio:
+
+A1 = [0.1, 0.2]  (un punto in basso a sinistra)
+A2 = [0.8, 0.9]  (un punto in alto a destra)
+B1 = [0.7, 0.8]  (un punto vicino ad A2)
+
+Disegniamo i punti su un piano:
+
+    ^ (asse y)
+    |
+1.0 |                   
+0.9 |                    A2 ●
+0.8 |                    B1 ●
+0.7 |
+0.6 |
+0.5 |
+0.4 |
+0.3 |
+0.2 | A1 ●
+0.1 |
+0.0 +------------------------------------------------→ (asse x)
+    0.0 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1.0
+
+PROBLEMI:
+
+1. A1 e A2 sono lontani tra loro (dovrebbero essere vicini - stesso segnale!)
+2. A2 e B1 sono vicini (dovrebbero essere lontani - segnali diversi!)
+
+CALCOLO DELLA SIMILARITÀ (coseno):
+
+Similarità tra A1 e A2 = 0.50 (bassa - dovrebbe essere alta)
+Similarità tra A2 e B1 = 0.95 (alta - dovrebbe essere bassa)
+
+LA LOSS CONTRASTIVA:
+
+La loss calcola:
+- Quanto sono simili le positive pairs (A1-A2, B1-B2)
+- Quanto sono diversi le negative pairs (A1-B1, A1-B2, A2-B1, A2-B2)
+
+In questo caso, la loss è ALTA perché:
+- A1 e A2 sono poco simili (positivi lontani)
+- A2 e B1 sono molto simili (negativi vicini)
+
+IL MODELLO IMPARA (backpropagation):
+
+Il modello aggiusta i suoi pesi per RIDURRE la loss.
+
+Cosa cerca di fare:
+1. AVVICINARE A1 e A2 (rendere più simile la positive pair)
+2. ALLONTANARE A2 da B1 (rendere più diversi i negativi)
+
+DOPO IL TRAINING (pesi ottimizzati):
+---> significa alla fine di TUTTE le epoche di contrastive learning.
+
+I embeddings si riorganizzano:
+
+A1 = [0.9, 0.1]  (in basso a destra)
+A2 = [0.8, 0.1]  (vicino ad A1)
+B1 = [0.1, 0.9]  (in alto a sinistra, lontano da A1 e A2)
+
+Disegniamo i nuovi punti:
+
+    ^ (asse y)
+    |
+1.0 |                   
+0.9 | B1 ●
+0.8 |
+0.7 |
+0.6 |
+0.5 |
+0.4 |
+0.3 |
+0.2 |
+0.1 |                    A1 ● A2 ● (sono vicini!)
+0.0 +------------------------------------------------→ (asse x)
+    0.0 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1.0
+
+RISULTATI OTTIMALI:
+
+Similarità tra A1 e A2 = 0.98 (alta ✅)
+Similarità tra A2 e B1 = 0.10 (bassa ✅)
+
+Ora:
+- A1 e A2 sono vicini (stesso segnale)
+- A2 e B1 sono lontani (segnali diversi)
+
+
+
+PERCHÉ QUESTO È UTILE PER LA CLASSIFICAZIONE?
+
+Dopo il training contrastivo, i segnali dello stesso tipo (es. tutti i N3) tendono a raggrupparsi insieme, 
+anche se non abbiamo usato le etichette. Il classificatore supervisionato (addestrato dopo) può separare facilmente 
+i 5 cluster (W, N1, N2, N3, REM) perché sono già ben distinti nello spazio.
+
+questo perche:
+
+FASE 1 - CONTRASTIVE LEARNING (senza etichette):
+Il modello impara a:
+- Avvicinare views augmentate dello STESSO segnale (qualsiasi segnale)
+- Allontanare views di segnali DIVERSI
+
+RISULTATO: 
+Segnali con caratteristiche simili (es. tutti i N3) finiscono VICINI nello spazio degli embeddings.
+Perché? Perché sono più simili tra loro che con altri tipi (W, REM, etc.)
+
+FASE 2 - CLASSIFICATORE SUPERVISIONATO (con poche etichette):
+Il classificatore impara a tracciare confini tra i cluster già formati.
+
+PERCHÉ FUNZIONA?
+
+Senza contrastive learning:
+I segnali sono mescolati casualmente. Servono MOLTE etichette per separarli.
+
+Con contrastive learning:
+I segnali sono già raggruppati per somiglianza. Servono POCHE etichette per separarli.
+
+
+
+
+
+CONCETTI CHIAVE:
+- Positive pairs: due views augmentate dello STESSO segnale
+- Negative pairs: views di segnali DIVERSI
+- Temperature (τ): controlla la "sharpness" delle similarità (bassa = più discriminativo)
+- InfoNCE: massimizza l'informazione mutua tra positive pairs
+
+in particolare:
+
+TEMPERATURE (τ) - COSA FA LA TEMPERATURA?
+
+La temperatura divide le similarità prima del softmax:
+similarity_matrix = similarity_matrix / temperature
+
+
+
+SOFTMAX : prende un vettore di numeri e li trasforma in probabilità (somma = 1).
+
+ESEMPIO:
+
+Input: [2.0, 1.0, 0.1]
+Dopo softmax: [0.66, 0.24, 0.10]  (somma = 1)
+
+FORMULA:
+
+P(i) = exp(x_i) / Σ exp(x_j)
+
+ESEMPIO NUMERICO:
+
+x = [2.0, 1.0, 0.1]
+
+exp(2.0) = 7.39
+exp(1.0) = 2.72
+exp(0.1) = 1.11
+Somma = 7.39 + 2.72 + 1.11 = 11.22
+
+P(0) = 7.39 / 11.22 = 0.66
+P(1) = 2.72 / 11.22 = 0.24
+P(2) = 1.11 / 11.22 = 0.10
+
+PROPRIETÀ:
+
+1. Tutte le probabilità sono > 0
+2. Somma = 1
+3. L'input più grande diventa la probabilità più alta
+4. Amplifica le differenze (2.0 → 66%, 1.0 → 24%)
+
+NEL CONTRASTIVE LEARNING:
+
+La matrice di similarità (2B x 2B) passa attraverso softmax.
+Per ogni riga (embedding anchor), il softmax dice:
+- Qual è la probabilità che l'altro embedding sia la sua positive pair
+- Quali sono le probabilità che siano negative pairs
+
+
+MATRICE DI SIMILARITÀ: una tabella che mostra quanto OGNI embedding è simile a OGNI altro embedding.
+
+ESEMPIO CON 4 EMBEDDINGS (A1, A2, B1, B2):
+
+La matrice è 4x4:
+
+        A1    A2    B1    B2
+A1    [1.0,   0.8,  0.2,  0.1]
+A2    [0.8,   1.0,  0.3,  0.2]
+B1    [0.2,   0.3,  1.0,  0.9]
+B2    [0.1,   0.2,  0.9,  1.0]
+
+LEGGERE LA MATRICE:
+
+- Riga A1: quanto A1 è simile a A1, A2, B1, B2
+- Colonna A2: quanto A2 è simile a A1, A2, B1, B2
+
+INTERPRETAZIONE:
+
+A1-A1 = 1.0 (identico a se stesso - diagonale)
+A1-A2 = 0.8 (molto simile - positiva pair)
+A1-B1 = 0.2 (poco simile - negativa pair)
+A1-B2 = 0.1 (molto poco simile - negativa pair)
+
+B1-B1 = 1.0 (identico a se stesso)
+B1-B2 = 0.9 (molto simile - positiva pair)
+B1-A1 = 0.2 (poco simile)
+
+NEL CONTRASTIVE LEARNING:
+
+VOGLIAMO:
+- Similarità ALTA sulla diagonale secondaria (A1-A2, B1-B2)
+- Similarità BASSA altrove
+
+MATRICE IDEALE:
+
+        A1    A2    B1    B2
+A1    [-inf,  0.9,  0.1,  0.1]
+A2    [0.9,  -inf,  0.1,  0.1]
+B1    [0.1,  0.1,  -inf,  0.9]
+B2    [0.1,  0.1,   0.9, -inf]
+
+- Diagonale principale (A1-A1, etc.) a -inf (mascherata)
+- Positive pairs (A1-A2, B1-B2) = 0.9
+- Negative pairs = 0.1
+
+COME SI CALCOLA:
+
+similarità = embedding_1 · embedding_2 / temperature
+
+Se embeddings sono normalizzati (||z||=1), il prodotto scalare = similarità coseno.
+
+VALORI POSSIBILI:
+- 1.0: embeddings identici (stessa direzione)
+- 0.0: embeddings ortogonali (indipendenti)
+- -1.0: embeddings opposti
+
+PERCHÉ SERVE:
+
+La matrice di similarità è l'input del softmax.
+Il softmax la trasforma in probabilità.
+La CrossEntropyLoss confronta queste probabilità con le labels delle positive pairs.
+
+
+
+ESEMPIO CON BATCH_SIZE=1:
+
+Similarità prima di softmax: [A1-A1, A1-A2, A1-B1, A1-B2]
+Dopo masking diagonale: [-inf, 0.8, 0.3, 0.2]
+Dopo softmax: [0, 0.52, 0.28, 0.20]
+
+Interpretazione:
+- A1 ha 52% di probabilità di essere simile ad A2 (positive pair)
+- 28% con B1, 20% con B2 (negative pairs)
+
+La loss vuole che la probabilità della positive pair sia vicina a 1 (100%).
+
+
+
+
+
+ESEMPIO CON SIMILARITÀ COSENO = 0.8
+
+Con τ = 0.5: 0.8 / 0.5 = 1.6 (similarità amplificata)
+Con τ = 1.0: 0.8 / 1.0 = 0.8 (invariata)
+Con τ = 2.0: 0.8 / 2.0 = 0.4 (similarità ridotta)
+
+EFFETTO SUL SOFTMAX:
+
+Softmax converte similarità in probabilità:
+P(i,j) = exp(sim(i,j)/τ) / Σ exp(sim(i,k)/τ)
+
+Con τ BASSA (es. 0.1):
+- La probabilità della positive pair diventa ALTA (vicina a 1)
+- Il modello è molto fiducioso e discriminativo
+- Rischio: overfitting, gradienti troppo estremi
+
+Con τ ALTA (es. 1.0):
+- Le probabilità sono più uniformi
+- Il modello è più cauto e stabile
+- Rischio: apprendimento lento, underfitting
+
+VALORI TIPICI:
+- τ = 0.07: molto discriminativo (SimCLR originale)
+- τ = 0.1: buon compromesso (default nel codice)
+- τ = 0.5: più stabile (usato nel paper)
+
+
+
+INFONCE - INFORMAZIONE MUTUA
+
+Misura quanto conoscere un embedding (z_i) ti dice sull'altro (z_j).
+
+Formula: I(z_i, z_j) = H(z_i) - H(z_i|z_j)
+dove H = entropia (incertezza)
+
+ALTA INFORMAZIONE MUTUA:
+Conoscere z_i riduce molto l'incertezza su z_j.
+Esempio: z_i e z_j sono quasi identici (positive pair).
+
+BASSA INFORMAZIONE MUTUA:
+Conoscere z_i non aiuta a predire z_j.
+Esempio: z_i e z_j sono indipendenti (negative pair).
+
+PERCHÉ MASSIMIZZARE L'INFONCE?
+
+La loss NT-Xent massimizza l'informazione mutua TRA le positive pairs,
+e la minimizza TRA le negative pairs.
+
+COSA SIGNIFICA IN PRATICA:
+
+Il modello impara che:
+- Due views dello STESSO segnale condividono MOLTA informazione
+- Due views di segnali DIVERSI condividono POCA informazione
+
+ESEMPIO CON SEGNALI EEG:
+
+Positive pair (stesso segnale N3):
+z_i e z_j condividono caratteristiche come:
+- presenza di onde lente
+- ampiezza alta
+- frequenza bassa
+→ Alta informazione mutua
+
+Negative pair (N3 vs REM):
+z_i (N3) e z_j (REM) condividono poche caratteristiche:
+- N3 ha onde lente, REM no
+- N3 ha ampiezza alta, REM variabile
+→ Bassa informazione mutua
+
+RISULTATO:
+
+Il modello impara a estrarre embeddings che:
+- Catturano le caratteristiche ESSENZIALI del segnale
+- Ignorano le variazioni dovute alle augmentations
+- Differenziano segnali di classi diverse
+
+
+
+Loss NT-Xent 
+
+FORMULA:
+Loss = -log( exp(sim(z_i, z_j)/τ) / Σ exp(sim(z_i, z_k)/τ) )
+dove sim = similarità coseno, τ = temperatura
+
+FUNZIONI:
+
+1. normalize_embeddings(embedding_1, embedding_2)
+   - Applica L2-normalization: z_normalized = z / ||z||₂
+   - Dopo normalizzazione, prodotto scalare = similarità coseno
+   - Output: (batch_size, embedding_dim)
+
+2. concatenate_embeddings(embedding_1, embedding_2)
+   - Concatena due batch lungo dimensione batch
+   - Input: (B, D) e (B, D) → Output: (2B, D)
+
+3. compute_similarity_matrix(embeddings, temperature)
+   - Calcola similarità coseno tra TUTTE le coppie
+   - similarity_matrix = embeddings × embeddings.T / temperature
+   - Output: (2B, 2B)
+
+4. mask_self_similarities(similarity_matrix, batch_size, device)
+   - Mette a -inf la diagonale (similarità con se stesso)
+   - Evita che il modello impari predizioni banali
+
+5. nt_xent_loss(embedding_1, embedding_2, temperature=0.5)
+   - FUNZIONE PRINCIPALE
+   - Flusso: normalizza → concatena → matrice similarità → maschera → CrossEntropy
+   - Labels: per i primi B embeddings, positivo è i+B; per gli ultimi B, positivo è i-B
+
+PARAMETRI TEMPERATURA:
+- τ = 0.07: molto sharp, per dataset grandi e ben separati
+- τ = 0.1: default SimCLR
+- τ = 0.5: smooth, per dataset piccoli o rumorosi
+
+ESEMPIO CON BATCH_SIZE=2:
+Segnali: A, B
+Views: A1, A2, B1, B2
+Obiettivo: A1 simile ad A2, B1 simile a B2
+Tutti gli altri (A1-B1, A1-B2, etc.) devono essere diversi
