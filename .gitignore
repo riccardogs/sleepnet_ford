@@ -29,3 +29,10 @@ report/*.zip
 # Dati
 data/*.npz
 data/*.npy
+data/
+report/
+z/
+*.npz
+*.npy
+*.pdf
+*.zip
