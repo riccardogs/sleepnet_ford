@@ -23,6 +23,152 @@ Caratteristiche:
     - L2 normalization: embeddings su sfera unitaria (similarità coseno)
 """
 
+
+
+
+"""
+MODIFICATO
+
+
+================================================================================
+PERCHÉ QUESTE MODIFICHE NELL'ENCODER (simple_sleep_net.py)
+================================================================================
+
+IL PROBLEMA:
+------------
+L'encoder originale era progettato per INPUT DI 3000 CAMPIONI (EEG a 100Hz per 30 secondi).
+FordA ha INPUT DI 500 CAMPIONI (~2 secondi a 250Hz).
+
+Con i parametri originali (kernel_size=64, stride=8, padding=63), la convoluzione
+cercava di elaborare un segnale di 500 campioni con filtri pensati per 3000 campioni,
+causando:
+- Padding eccessivo (63 campioni di zero su 500 totali)
+- Kernel troppo grandi (64 campioni su 500)
+- Stride troppo alti (riduce troppo velocemente la dimensione)
+
+================================================================================
+LE MODIFICHE PRINCIPALI
+================================================================================
+
+1. RIDUZIONE PROPORZIONALE DEI KERNEL
+   - Prima: kernel_size=64 (2.1% di 3000)
+   - Dopo:  kernel_size=16 (3.2% di 500)
+   → Il kernel copre una porzione simile del segnale (2-3%)
+
+2. RIDUZIONE PROPORZIONALE DELLO STRIDE
+   - Prima: stride=8 (riduce dimensione di 8x)
+   - Dopo:  stride=4 (riduce dimensione di 4x)
+   → Per 500 campioni, stride=8 ridurrebbe troppo velocemente
+
+3. RIDUZIONE PROPORZIONALE DEL PADDING
+   - Prima: padding=63 (12.6% di 500 - assurdo!)
+   - Dopo:  padding=7 (1.4% di 500 - ragionevole)
+   → Il padding originale era enorme per FordA
+
+4. RIDUZIONE DEL NUMERO DI FILTRI
+   - Prima: 32 → 64 → 128 filtri
+   - Dopo:  16 → 32 → 64 filtri
+   → Dataset più piccolo (5000 campioni vs ~40000 EEG)
+   → Riduce overfitting e parametri inutili
+
+5. RIDUZIONE DEL LATENT_DIM
+   - Prima: 128 dimensioni
+   - Dopo:  64 dimensioni (parametro di default)
+   → Spazio latente più compatto per dataset più piccolo
+
+================================================================================
+CONFRONTO DETTAGLIATO
+================================================================================
+
+BLOCCO 1 (primo layer convolutivo):
+┌─────────────────┬──────────────────┬─────────────────┐
+│ Parametro       │ Prima (EEG)      │ Dopo (FordA)    │
+├─────────────────┼──────────────────┼─────────────────┤
+│ in_channels     │ 1                │ 1               │
+│ out_channels    │ 32               │ 16              │
+│ kernel_size     │ 64               │ 16              │
+│ stride          │ 8                │ 4               │
+│ padding         │ 63               │ 7               │
+│ dilation        │ 1                │ 1               │
+└─────────────────┴──────────────────┴─────────────────┘
+
+BLOCCO 2:
+┌─────────────────┬──────────────────┬─────────────────┐
+│ Parametro       │ Prima (EEG)      │ Dopo (FordA)    │
+├─────────────────┼──────────────────┼─────────────────┤
+│ in_channels     │ 32               │ 16              │
+│ out_channels    │ 64               │ 32              │
+│ kernel_size     │ 32               │ 8               │
+│ stride          │ 4                │ 2               │
+│ padding         │ 62               │ 5               │
+│ dilation        │ 2                │ 2               │
+└─────────────────┴──────────────────┴─────────────────┘
+
+BLOCCO 3:
+┌─────────────────┬──────────────────┬─────────────────┐
+│ Parametro       │ Prima (EEG)      │ Dopo (FordA)    │
+├─────────────────┼──────────────────┼─────────────────┤
+│ in_channels     │ 64               │ 32              │
+│ out_channels    │ 128              │ 64              │
+│ kernel_size     │ 16               │ 4               │
+│ stride          │ 2                │ 2               │
+│ padding         │ 60               │ 4               │
+│ dilation        │ 4                │ 4               │
+└─────────────────┴──────────────────┴─────────────────┘
+
+================================================================================
+IMPATTO SULLE DIMENSIONI
+================================================================================
+
+PERCORSO DEL SEGNALE (da 500 campioni a embedding):
+
+Input:                    (Batch, 1, 500)
+                           ↓
+Conv1 (k16, s4, pad7):    (Batch, 16, ~125)   # 500/4 ≈ 125
+                           ↓
+Conv2 (k8, s2, pad5):     (Batch, 32, ~62)    # 125/2 ≈ 62
+                           ↓
+Conv3 (k4, s2, pad4):     (Batch, 64, ~31)    # 62/2 ≈ 31
+                           ↓
+AdaptiveAvgPool1d(1):     (Batch, 64, 1)
+                           ↓
+Flatten:                  (Batch, 64)
+                           ↓
+Linear(64 → latent_dim):  (Batch, latent_dim)  # default 64
+                           ↓
+L2 Normalization:         (Batch, latent_dim)
+
+================================================================================
+PERCHÉ QUESTE MODIFICHE SONO CORRETTE?
+================================================================================
+
+1. PRESERVANO LA GERARCHIA TEMPORALE
+   - 3 blocchi convolutivi come nell'originale
+   - Convoluzioni dilate mantenute (dilation=1,2,4)
+   - Stessa filosofia architetturale
+
+2. RISPETTANO LE PROPORZIONI
+   - Il rapporto kernel_size/input_length è simile (~2-3%)
+   - Il numero di layer è lo stesso (3 blocchi)
+   - La riduzione dimensionale è graduale
+
+3. EVITANO OVERFITTING
+   - Meno parametri totali (adatto a dataset più piccolo)
+   - Dropout mantenuto a 0.2
+   - BatchNorm presente in ogni blocco
+
+4. MANTENGONO LA FUNZIONALITÀ
+   - L2 normalization alla fine (per similarità coseno)
+   - Projection head (MLP finale)
+   - AdaptiveAvgPooling (indipendente dalla lunghezza)
+
+================================================================================
+RISULTATO: L'ENCODER ORA FUNZIONA CORRETTAMENTE CON FORDA (500 CAMPIONI)!
+================================================================================
+
+
+"""
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -113,7 +259,8 @@ class SimpleSleepNet(nn.Module):
         
         self.latent_dim = latent_dim
         self.dropout = nn.Dropout(p=dropout)
-        
+
+        """
         # ====================================================================
         # CONVOLUTIONAL PATH (Feature Extractor)
         # ====================================================================
@@ -172,7 +319,54 @@ class SimpleSleepNet(nn.Module):
             Mish(),
             self.dropout,
         )
+        """
+
+        self.conv_path = nn.Sequential(
+            # BLOCCO 1: 500 → ~125 campioni
+            nn.Conv1d(
+                in_channels=1,
+                out_channels=16,
+                kernel_size=16,
+                stride=4,
+                padding=7,
+                dilation=1,
+                bias=False
+            ),
+            nn.BatchNorm1d(16),
+            Mish(),
+            self.dropout,
+            
+            # BLOCCO 2: ~125 → ~62 campioni
+            nn.Conv1d(
+                in_channels=16,
+                out_channels=32,
+                kernel_size=8,
+                stride=2,
+                padding=5,
+                dilation=2,
+                bias=False
+            ),
+            nn.BatchNorm1d(32),
+            Mish(),
+            self.dropout,
+            
+            # BLOCCO 3: ~62 → ~31 campioni
+            nn.Conv1d(
+                in_channels=32,
+                out_channels=64,
+                kernel_size=4,
+                stride=2,
+                padding=4,
+                dilation=4,
+                bias=False
+            ),
+            nn.BatchNorm1d(64),
+            Mish(),
+            self.dropout,
+        )
         
+
+    
         # ====================================================================
         # FULLY CONNECTED PATH (Projection Head)
         # ====================================================================
@@ -180,7 +374,7 @@ class SimpleSleepNet(nn.Module):
         # Questo strato è talvolta chiamato "projection head" nel contrastive learning
         # ====================================================================
         self.fc = nn.Sequential(
-            nn.Linear(128, self.latent_dim),        # Proiezione lineare
+            nn.Linear(64, self.latent_dim),        # Proiezione lineare
             nn.BatchNorm1d(self.latent_dim),        # Normalizzazione
             Mish(),                                 # Attivazione
             self.dropout                            # Regolarizzazione

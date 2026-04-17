@@ -1,24 +1,21 @@
-import pandas as pd
+from aeon.datasets import load_classification
 import numpy as np
-import os
 
-print("📥 Download FordA dataset...")
+print(' Scaricando FordA originale con aeon...')
 
-# URL del dataset
-url_train = 'https://www.timeseriesclassification.com/Downloads/FordA_TRAIN.tsv'
-url_test = 'https://www.timeseriesclassification.com/Downloads/FordA_TEST.tsv'
+X, y = load_classification('FordA')
 
-# Scarica
-train = pd.read_csv(url_train, sep='\t', header=None)
-test = pd.read_csv(url_test, sep='\t', header=None)
+print(f'✅ Dataset caricato: {X.shape}')
+print(f'   Shape: {X.shape}')
+print(f'   y shape: {y.shape}')
 
-print(f"✅ Train: {train.shape}")
-print(f"✅ Test: {test.shape}")
+# Salva originale senza modifiche
+np.savez('data/forda_originale.npz',
+         X=X,
+         y=y)
 
-# Salva
-np.save('data/forda_train.npy', train.values)
-np.save('data/forda_test.npy', test.values)
-
-print("💾 Dataset salvato in data/")
-print(f"   - Classi nel train: {np.unique(train.iloc[:, 0].values)}")
-print(f"   - Classi nel test: {np.unique(test.iloc[:, 0].values)}")
+print('💾 Salvato in data/forda_originale.npz')
+print(f'   Campioni totali: {X.shape[0]}')
+print(f'   Lunghezza sequenza: {X.shape[2]}')
+print(f'   Canali: {X.shape[1]}')
+print(f'   Classi: {np.unique(y)}')

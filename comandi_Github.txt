@@ -17,3 +17,4 @@ cd /Users/riccardosasu/Desktop/sleepnet_ford
 source venv_ford/bin/activate
 
 
+python main.py --config configs/default/config.json

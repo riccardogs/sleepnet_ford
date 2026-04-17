@@ -1,15 +1,5 @@
 """
-CLASSIFIER TRAINING - SimpleSleepNet
-=====================================
-Questo file gestisce l'addestramento supervisionato del classificatore.
-L'encoder è FREEZ (non viene addestrato), si addestra solo il classificatore
-per predire i 5 stadi del sonno (W, N1, N2, N3, REM).
-
-Filosofia:
-    1. L'encoder ha già imparato rappresentazioni utili (contrastive learning)
-    2. Si aggiunge un classificatore MLP in cima
-    3. Si addestra SOLO il classificatore mantenendo l'encoder congelato
-    4. Questo è chiamato "linear evaluation" o "fine-tuning"
+NESSUNA MODIFICA 
 """
 
 import torch
@@ -23,40 +13,7 @@ logger = logging.getLogger(__name__)
 
 
 def evaluate_classifier(encoder, classifier, data_loader, criterion, device='cuda'):
-    """
-    VALUTA IL CLASSIFICATORE SU UN DATASET
-    =======================================
-    
-    Cosa fa:
-        1. Passa i dati attraverso l'encoder (frozen) per ottenere embeddings
-        2. Passa gli embeddings attraverso il classificatore
-        3. Calcola loss e accuratezza
-    
-    Differenza dal training:
-        - model.eval(): disattiva dropout
-        - torch.no_grad(): disabilita gradienti (risparmia memoria)
-        - Non aggiorna i pesi
-    
-    Parametri:
-    ----------
-    encoder : SimpleSleepNet
-        Encoder pre-addestrato (frozen, non si addestra)
-    classifier : SleepStageClassifier
-        Classificatore MLP da valutare
-    data_loader : DataLoader
-        Dataset di validazione o test
-    criterion : nn.Module
-        Funzione di loss (CrossEntropyLoss)
-    device : str
-        'cuda', 'mps', o 'cpu'
-    
-    Returns:
-    --------
-    avg_loss : float
-        Loss media sul dataset
-    accuracy : float
-        Accuratezza (0-1), es. 0.8868 = 88.68%
-    """
+
     try:
         # Modalità valutazione (dropout disattivato)
         encoder.eval()
@@ -98,12 +55,7 @@ def evaluate_classifier(encoder, classifier, data_loader, criterion, device='cud
 
 
 def save_model(classifier, save_path):
-    """
-    SALVA IL CLASSIFICATORE SU DISCO
-    =================================
-    
-    Salva solo i pesi (state_dict), non l'architettura.
-    """
+
     try:
         torch.save(classifier.state_dict(), save_path)
         logger.info("Saved best model to %s", save_path)
@@ -113,44 +65,7 @@ def save_model(classifier, save_path):
 
 
 def train_epoch(encoder, classifier, train_loader, criterion, optimizer, device, epoch):
-    """
-    ADDESTRA IL CLASSIFICATORE PER UNA SINGOLA EPOCH
-    ================================================
     
-    Cosa fa:
-        1. Prende batch di (segnale, label)
-        2. Passa il segnale attraverso encoder (frozen) → embeddings
-        3. Passa embeddings attraverso classificatore → logits
-        4. Calcola CrossEntropyLoss tra logits e label vere
-        5. Backpropagation e aggiornamento SOLO del classificatore
-    
-    NOTA: L'encoder è in modalità eval() e i suoi gradienti sono disabilitati
-    con torch.no_grad(). Solo i parametri del classificatore vengono aggiornati.
-    
-    Parametri:
-    ----------
-    encoder : SimpleSleepNet
-        Encoder pre-addestrato (FROZEN)
-    classifier : SleepStageClassifier
-        Classificatore da addestrare
-    train_loader : DataLoader
-        Dataset di training con (segnale, label)
-    criterion : nn.Module
-        Funzione di loss (CrossEntropyLoss)
-    optimizer : Optimizer
-        Ottimizzatore per il classificatore (es. Adam)
-    device : str
-        'cuda', 'mps', o 'cpu'
-    epoch : int
-        Numero epoca corrente (per logging)
-    
-    Returns:
-    --------
-    avg_train_loss : float
-        Loss media sull'epoca
-    epoch_duration : float
-        Durata dell'epoca in secondi
-    """
     try:
         tensorboard_logger = get_tensorboard_logger()
         
@@ -237,54 +152,7 @@ def train_classifier(
     check_interval=25,
     min_improvement=0.01
 ):
-    """
-    LOOP PRINCIPALE DI ADDESTRAMENTO DEL CLASSIFICATORE
-    ====================================================
     
-    Questa funzione coordina l'addestramento supervisionato del classificatore.
-    L'encoder rimane FREEZ (congelato) durante tutto il processo.
-    
-    Flow:
-        1. Per ogni epoca: chiama train_epoch() che addestra SOLO il classificatore
-        2. Ogni 'check_interval' epoche: calcola validation loss e accuracy
-        3. Se validation loss migliora: salva il modello
-        4. Se non migliora per 'check_interval' epoche: early stopping
-    
-    Perché tenere l'encoder frozen?
-        - Preserva le rappresentazioni apprese dal contrastive learning
-        - Previene overfitting (pochi dati etichettati)
-        - Molto più veloce (meno parametri da addestrare)
-    
-    Parametri:
-    ----------
-    encoder : SimpleSleepNet
-        Encoder pre-addestrato (FROZEN)
-    classifier : SleepStageClassifier
-        Classificatore da addestrare
-    train_loader : DataLoader
-        Dataset di training con etichette
-    val_loader : DataLoader
-        Dataset di validazione
-    criterion : nn.Module
-        Funzione di loss (CrossEntropyLoss)
-    optimizer : Optimizer
-        Ottimizzatore per il classificatore
-    num_epochs : int
-        Numero massimo di epoche
-    device : str
-        'cuda', 'mps', o 'cpu'
-    save_path : str
-        Dove salvare il miglior classificatore
-    check_interval : int
-        Ogni quante epoche fare validazione
-    min_improvement : float
-        Miglioramento minimo per considerare progresso
-    
-    Returns:
-    --------
-    best_val_loss : float
-        Miglior validation loss raggiunto
-    """
     try:
         tensorboard_logger = get_tensorboard_logger()
         

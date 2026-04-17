@@ -7,55 +7,44 @@ from torch.utils.data import Dataset
 logger = logging.getLogger(__name__)
 
 class ContrastiveEEGDataset(Dataset):
-    """
-    A PyTorch Dataset for contrastive learning with EEG signals.
-    
-    This dataset applies augmentations to EEG signals and returns pairs of augmented signals.
-    """
     def __init__(self, eeg_signals, augmentations=None, return_labels=False):
-        """
-        Initialize the ContrastiveEEGDataset.
+        logger.debug(f"Creating ContrastiveEEGDataset")
         
-        Parameters:
-        eeg_signals (dict): Dictionary containing EEG signals per class.
-        augmentations (list): A list of augmentation callables.
-        return_labels (bool): Whether to return labels in __getitem__.
-        """
-        logger.debug(f"Creating ContrastiveEEGDataset with {len(eeg_signals)} classes")
-        self.data = np.array([signal for signals in eeg_signals.values() for signal in signals])
-        self.labels = np.array([label for label, signals in eeg_signals.items() for _ in signals])
+        if isinstance(eeg_signals, tuple) and len(eeg_signals) == 2:
+            X, y = eeg_signals
+            # Assicura che X sia 3D (campioni, canali, tempo)
+            if len(X.shape) == 2:
+                X = X.reshape(X.shape[0], 1, X.shape[1])
+            elif len(X.shape) == 4:
+                X = X.reshape(X.shape[0], X.shape[1], X.shape[3])
+            self.data = X
+            self.labels = y
+        else:
+            raise ValueError(f"Formato non supportato: {type(eeg_signals)}")
+            
         self.augmentations = augmentations or []
         self.return_labels = return_labels
         self.requires_x_random = any(getattr(aug, 'requires_x_random', False) for aug in self.augmentations)
-        logger.info(f"ContrastiveEEGDataset created with {len(self.data)} samples")
+        logger.info(f"ContrastiveEEGDataset created with {len(self.data)} samples, shape: {self.data.shape}")
         
     def __len__(self):
-        """
-        Return the number of samples in the dataset.
-        
-        Returns:
-        int: Number of samples.
-        """
         return len(self.data)
     
     def __getitem__(self, idx):
-        """
-        Get a pair of augmented EEG signals and optionally the label.
-        
-        Parameters:
-        idx (int): Index of the sample to retrieve.
-        
-        Returns:
-        tuple: A tuple containing two augmented EEG signals and optionally the label.
-        """
         try:
-            signal = self.data[idx]
+            signal = self.data[idx]  # Shape (1, 500)
             label = self.labels[idx]
-            random_signal = self.data[random.randint(0, len(self.data) - 1)] if self.requires_x_random else None
-            augmented_signal_i = self.apply_augmentations(signal, random_signal)
-            augmented_signal_j = self.apply_augmentations(signal, random_signal)
             
-            # Convert to torch tensors and add channel dimension
+            # Converti in 1D per le augmentations
+            signal_1d = signal.squeeze(0)  # Shape (500,)
+            
+            random_signal = self.data[random.randint(0, len(self.data) - 1)] if self.requires_x_random else None
+            random_signal_1d = random_signal.squeeze(0) if random_signal is not None else None
+            
+            augmented_signal_i = self.apply_augmentations(signal_1d.copy(), random_signal_1d)
+            augmented_signal_j = self.apply_augmentations(signal_1d.copy(), random_signal_1d)
+            
+            # Converti in tensore e aggiungi dimensione canale
             augmented_signal_i = torch.tensor(augmented_signal_i, dtype=torch.float32).unsqueeze(0)
             augmented_signal_j = torch.tensor(augmented_signal_j, dtype=torch.float32).unsqueeze(0)
             
@@ -69,16 +58,6 @@ class ContrastiveEEGDataset(Dataset):
             raise
 
     def apply_augmentations(self, signal, random_signal):
-        """
-        Apply augmentations to the given EEG signal.
-        
-        Parameters:
-        signal (np.ndarray): EEG signal to augment.
-        random_signal (np.ndarray): Random EEG signal for augmentations that require it.
-        
-        Returns:
-        np.ndarray: Augmented EEG signal.
-        """
         for aug in self.augmentations:
             signal = aug(signal, random_signal) if getattr(aug, 'requires_x_random', False) else aug(signal)
         return signal

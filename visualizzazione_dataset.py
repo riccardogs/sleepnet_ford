@@ -1,8 +1,8 @@
 """
-VISUALIZZATORE DATASET FORDA 
+VISUALIZZATORE DATASET FORDA - ORIGINALE
 =================================================
 Questo script permette di:
-1. Visualizzare le shape del dataset FordA
+1. Visualizzare le shape del dataset FordA originale
 2. Plottare segnali normali vs anomali
 3. Mostrare la distribuzione delle etichette
 """
@@ -15,11 +15,11 @@ from collections import Counter
 # CONFIGURAZIONE
 # ============================================================================
 
-DATA_PATH = "/Users/riccardosasu/Desktop/sleepnet_ford/data/forda_real.npz"
+DATA_PATH = "/Users/riccardosasu/Desktop/sleepnet_ford/data/forda_originale.npz"
 
-# Mappa etichette (FordA: 0=normale, 1=anomalo)
-LABELS = {0: "NORMALE (Healthy)", 1: "ANOMALO (Fault)"}
-COLORS = {0: "green", 1: "red"}
+# Mappa etichette (FordA originale: -1=normale, 1=anomalo)
+LABELS = {-1: "NORMALE (Healthy)", 1: "ANOMALO (Fault)"}
+COLORS = {-1: "green", 1: "red"}
 
 # Frequenza di campionamento (stimata per FordA - 500 punti in ~1-2 secondi)
 SAMPLE_RATE = 250  # Hz (approssimativo)
@@ -30,34 +30,30 @@ SAMPLE_RATE = 250  # Hz (approssimativo)
 # ============================================================================
 
 def load_forda_data(data_path=DATA_PATH):
-    """Carica il dataset FordA dal file .npz."""
+    """Carica il dataset FordA originale dal file .npz."""
     data = np.load(data_path)
     
-    X_train = data['X_train']
-    y_train = data['y_train']
-    X_val = data['X_val']
-    y_val = data['y_val']
-    X_test = data['X_test']
-    y_test = data['y_test']
+    X = data['X']  # shape: (4921, 1, 500)
+    y = data['y']  # classi: '-1' e '1'
     
-    # Combina train e val per analisi completa
-    X = np.vstack([X_train, X_val])
-    y = np.hstack([y_train, y_val])
+    # Converti y da stringa a intero
+    y = y.astype(int)
+    
+    # Rimuovi la dimensione del canale (da 3D a 2D)
+    X = X.reshape(X.shape[0], -1)
     
     print("=" * 80)
-    print("DATASET FORDA - CARICATO")
+    print("DATASET FORDA ORIGINALE - CARICATO")
     print("=" * 80)
     print(f"\n📊 Shape dei dati:")
-    print(f"   Train: {X_train.shape}")
-    print(f"   Val:   {X_val.shape}")
-    print(f"   Test:  {X_test.shape}")
-    print(f"   Totale (train+val): {X.shape}")
+    print(f"   X shape: {X.shape} (campioni, tempo)")
+    print(f"   y shape: {y.shape}")
     
     print(f"\n📊 Distribuzione etichette:")
-    print(f"   Normali (0): {sum(y==0)}")
+    print(f"   Normali (-1): {sum(y==-1)}")
     print(f"   Anomali (1): {sum(y==1)}")
     
-    return X, y, X_train, y_train, X_val, y_val, X_test, y_test
+    return X, y
 
 
 # ============================================================================
@@ -77,7 +73,7 @@ def plot_signal(signal, label, title="FordA Signal"):
     color = COLORS.get(label, "blue")
     ax.plot(time_axis, signal, color=color, linewidth=0.8)
     ax.set_xlabel('Tempo (secondi)')
-    ax.set_ylabel('Ampiezza (unità normalizzate)')
+    ax.set_ylabel('Ampiezza')
     ax.set_title(f'{title} - {LABELS.get(label, label)}')
     ax.grid(True, alpha=0.3)
     ax.set_xlim(0, duration)
@@ -108,7 +104,7 @@ def plot_label_distribution(y):
     bars = ax.bar(labels_names, counts, color=colors_list, edgecolor='black')
     ax.set_xlabel('Classe')
     ax.set_ylabel('Numero di campioni')
-    ax.set_title('Distribuzione delle classi nel dataset FordA')
+    ax.set_title('Distribuzione delle classi nel dataset FordA Originale')
     
     for bar, count in zip(bars, counts):
         ax.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 5,
@@ -128,7 +124,7 @@ def plot_label_distribution(y):
 def plot_normal_vs_anomaly(X, y):
     """Confronta un segnale normale con uno anomalo."""
     # Trova un indice normale e uno anomalo
-    normal_idx = np.where(y == 0)[0][0]
+    normal_idx = np.where(y == -1)[0][0]
     anomaly_idx = np.where(y == 1)[0][0]
     
     fig, axes = plt.subplots(2, 1, figsize=(15, 8))
@@ -140,7 +136,7 @@ def plot_normal_vs_anomaly(X, y):
     # Segnale normale
     axes[0].plot(time_axis, X[normal_idx], 'green', linewidth=0.8)
     axes[0].set_ylabel('Ampiezza')
-    axes[0].set_title(f'NORMALE - {LABELS[0]}')
+    axes[0].set_title(f'NORMALE - {LABELS[-1]}')
     axes[0].grid(True, alpha=0.3)
     axes[0].set_xlim(0, duration)
     
@@ -212,7 +208,7 @@ def print_statistics(X, y):
     print(f"   Max globale: {X.max():.4f}")
     
     print(f"\n📊 Statistiche per classe:")
-    for label in [0, 1]:
+    for label in [-1, 1]:
         mask = y == label
         class_data = X[mask]
         print(f"\n   {LABELS[label]}:")
@@ -227,15 +223,15 @@ def print_statistics(X, y):
 # ============================================================================
 
 def main():
-    """Esegue l'analisi completa del dataset FordA."""
+    """Esegue l'analisi completa del dataset FordA originale."""
     
     print("=" * 80)
-    print("VISUALIZZATORE DATASET FORDA")
+    print("VISUALIZZATORE DATASET FORDA - ORIGINALE")
     print("=" * 80)
     
     # 1. Carica il dataset
     print("\n🔍 CARICAMENTO DATASET...")
-    X, y, X_train, y_train, X_val, y_val, X_test, y_test = load_forda_data()
+    X, y = load_forda_data()
     
     # 2. Distribuzione etichette
     print("\n" + "=" * 80)
@@ -256,22 +252,22 @@ def main():
     print("\n" + "=" * 80)
     print("ESEMPI DI SEGNALI NORMALI")
     print("=" * 80)
-    normal_indices = np.where(y == 0)[0][:3]
-    plot_multiple_signals(X, y, normal_indices, title="Segnali Normali")
+    normal_indices = np.where(y == -1)[0][:3]
+    plot_multiple_signals(X, y, normal_indices, title="Segnali Normali Originali")
     
     # 6. Esempi di segnali anomali
     print("\n" + "=" * 80)
     print("ESEMPI DI SEGNALI ANOMALI")
     print("=" * 80)
     anomaly_indices = np.where(y == 1)[0][:3]
-    plot_multiple_signals(X, y, anomaly_indices, title="Segnali Anomali")
+    plot_multiple_signals(X, y, anomaly_indices, title="Segnali Anomali Originali")
     
     # 7. Plot di un singolo segnale a scelta
     print("\n" + "=" * 80)
     print("ANALISI SINGOLO SEGNALE")
     print("=" * 80)
     sample_idx = 0
-    plot_signal(X[sample_idx], y[sample_idx], title=f"FordA - Campione {sample_idx}")
+    plot_signal(X[sample_idx], y[sample_idx], title=f"FordA Originale - Campione {sample_idx}")
     
     print("\n✅ Analisi completata!")
 

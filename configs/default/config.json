@@ -1,16 +1,16 @@
 {
   "seed": 42,
   "results_folder": "results",
-  "num_workers": 8,
+  "num_workers": 4,
   "dataset": {
-    "dset_path": "./dset/Sleep-EDF-2018/npz/Fpz-Cz",
-    "max_files": 45
+    "dset_path": "data/forda_originale.npz",
+    "max_files": 4921
   },
   "pretraining_params": {
-    "batch_size": 1024,
-    "temperature": 0.1,
+    "batch_size": 64,
+    "temperature": 0.07,
     "dropout_rate": 0.2,
-    "latent_dim": 128,
+    "latent_dim": 64,
     "learning_rate": 0.001,
     "max_epochs": 1,
     "check_interval": 1,
@@ -20,10 +20,10 @@
   "latent_space_params": {
     "umap_enabled": false,
     "pca_enabled": false,
-    "tsne_enabled": true,
-    "visualize": true,
+    "tsne_enabled": false,
+    "visualize": false,
     "compute_metrics": false,
-    "n_clusters": 5,
+    "n_clusters": 2,
     "output_image_dir": "latent_space/visualizations",
     "output_metrics_dir": "latent_space/metrics",
     "visualization_fraction": 0.5
@@ -31,12 +31,12 @@
   "sup_training_params": {
     "learning_rate": 0.001,
     "max_epochs": 1,
-    "dropout_rate": 0.5,
+    "dropout_rate": 0.3,
     "check_interval": 1,
     "min_improvement": 0.005,
     "best_model_pth": "checkpoints/classifier/classifier_"
   },
-  "experiment_num": 1111,
+  "experiment_num": 1,
   "augmentations": {
     "TimeWarping": {
       "p": 1.0

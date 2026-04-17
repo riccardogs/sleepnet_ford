@@ -26,7 +26,7 @@ import torch.nn as nn
 from torch.utils.data import DataLoader
 
 from datasets import ContrastiveEEGDataset, SupervisedEEGDataset
-from utils import load_eeg_data, validate_config, set_seed, setup_logging, setup_tensorboard, get_tensorboard_logger, close_tensorboard
+from utils import validate_config, set_seed, setup_logging, setup_tensorboard, get_tensorboard_logger, close_tensorboard
 from models import SimpleSleepNet, SleepStageClassifier
 from training import train_contrastive_model, train_classifier
 from evaluation import LatentSpaceEvaluator, get_predictions, ResultsSaver
@@ -42,7 +42,17 @@ def suppress_warnings():
 
 suppress_warnings()
 
-NUM_CLASSES = 5  # W, N1, N2, N3, REM
+
+
+
+
+#MODIFICA PRINCIPALE: NUM_CLASSES = 2 (normale vs anomalo) invece di 5 stadi del sonno
+# NUM_CLASSES = 5  # W, N1, N2, N3, REM
+
+NUM_CLASSES = 2 # Normale, Anomalo
+
+
+
 
 
 def parse_args():
@@ -167,63 +177,12 @@ def setup_environment(config):
 
 
 
-
+"""
 def prepare_datasets(config, logger):
-    """
-    Prepara i dataset e i dataloader per il training supervisionato.
-    
-    IMPORTANTE: Lo split train/test viene fatto UNA VOLTA da load_eeg_data().
-    train_loader contiene i soggetti di training (85% = 12 soggetti)
-    test_loader contiene i soggetti di test (15% = 3 soggetti)
-    
-    Args:
-        config (dict): Configurazione
-        logger: Logger
-        
-    Returns:
-        tuple: (eeg_data, train_loader, test_loader)
-    """
-
+ 
     BATCH_SIZE = config["pretraining_params"]["batch_size"]
     NUM_WORKERS = config["num_workers"]
-    
-    """
-        BATCH_SIZE = numero di campioni elaborati contemporaneamente dal modello.
 
-        Esempio con BATCH_SIZE=256:
-        - Il modello prende 256 segnali EEG
-        - Calcola gli embeddings per tutti e 256 in parallelo
-        - Aggiorna i pesi UNA VOLTA dopo aver visto 256 campioni
-
-        NUM_WORKERS = numero di processi che caricano i dati in parallelo.
-
-        Esempio con NUM_WORKERS=8:
-        - 8 processi separati leggono i file NPZ contemporaneamente
-        - Preparano i batch mentre il modello sta elaborando
-        - Riduce i tempi di attesa per i dati
-
-                PERCHÉ SONO IMPORTANTI:
-
-                BATCH_SIZE grande:
-                - ✅ Più stabile (gradiente più accurato)
-                - ✅ Più veloce (parallelismo)
-                - ❌ Richiede più memoria GPU/RAM
-
-                BATCH_SIZE piccolo:
-                - ✅ Meno memoria
-                - ❌ Gradiente più rumoroso
-                - ❌ Più lento
-
-                NUM_WORKERS alto:
-                - ✅ Caricamento dati più veloce
-                - ❌ Più consumo CPU
-                - ❌ Overhead di comunicazione
-
-        VALORI TIPICI NEL TUO CODICE:
-        - BATCH_SIZE: 256 o 512
-        - NUM_WORKERS: 8 (nel tuo config)
-    """ 
-    
     # Carica i dati e fa lo split per soggetti
     eeg_data = load_eeg_data(
         dataset_path=config['dataset']['dset_path'],
@@ -241,45 +200,37 @@ def prepare_datasets(config, logger):
     logger.info("Supervised datasets and dataloaders created.")
     
     return eeg_data, train_loader, test_loader
-
-"""
-quindi qui:
-
-Hai già i dati divisi in:
-- eeg_data['train'] = 12 soggetti (85%)
-- eeg_data['test'] = 3 soggetti (15%)
-
-ORA devi prepararli per essere usati dal modello.
-
-1. SupervisedEEGDataset(eeg_data['train'])
-   → Trasforma i dati grezzi in un formato che PyTorch capisce
-   → Ogni elemento = (segnale_EEG, label)
-   → Esempio: ( [0.5, 0.3, ...], 2 )  segnale + etichetta N2
-
-2. DataLoader(...)
-   → Prende il dataset e lo suddivide in "pacchetti" (batch)
-   → Ogni volta che chiedi un batch, il DataLoader ti dà BATCH_SIZE esempi
-   → Gestisce anche il caricamento in parallelo (num_workers)
-
-shuffle=True per train:
-   → Mescola i campioni ad ogni epoca
-   → Evita che il modello impari l'ordine dei dati
-
-shuffle=False per test:
-   → Non mescola (l'ordine non importa)
-   → Riproducibile
-
-RISULTATO FINALE:
-
-train_loader = ti dà batch di (256 segnali, 256 labels) dal training set
-test_loader = ti dà batch di (256 segnali, 256 labels) dal test set
-
-QUINDI:
-
-Dataset → DataLoader → Batch pronti per il modello
 """
 
 
+def prepare_datasets(config, logger):
+    """
+    Prepara i dataset e i dataloader per il training supervisionato.
+    """
+    BATCH_SIZE = config["pretraining_params"]["batch_size"]
+    NUM_WORKERS = config["num_workers"]
+    
+    # Carica i dati FordA
+    from utils.forda_loader import FordADataLoader
+    loader = FordADataLoader(config['dataset']['dset_path'])
+    data = loader.load_data()
+    
+    # Adatta alla struttura che SimpleSleepNet si aspetta
+    eeg_data = {
+        'train': data['train'],   # (X_train, y_train)
+        'test': data['test']      # (X_test, y_test)
+    }
+    logger.info("Loaded train and test sets from FordA")
+
+    # Crea dataset supervisionati (segnale, label)
+    train_dataset = SupervisedEEGDataset(eeg_data['train'])
+    test_dataset = SupervisedEEGDataset(eeg_data['test'])
+
+    train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS)
+    test_loader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=False, num_workers=NUM_WORKERS)
+    logger.info("Supervised datasets and dataloaders created.")
+    
+    return eeg_data, train_loader, test_loader
 
 
 
@@ -340,9 +291,17 @@ def pretrain_contrastive_model(config, eeg_data, device, logger, tensorboard_log
     # Inizializza encoder
     encoder = SimpleSleepNet(latent_dim=LATENT_DIM, dropout=DROP_PROB).to(device)
     
+
+    #MODIFICA (numero di canali e lunghezza del segnale)
     # Log dell'architettura su TensorBoard
-    sample_input = torch.zeros(1, 1, 3000).to(device)
+    # sample_input = torch.zeros(1, 1, 3000).to(device)
+
+    sample_input = torch.zeros(1, 1, 500).to(device)
+
     tensorboard_logger.add_graph(encoder, sample_input)
+
+
+
     
     total_params = sum(p.numel() for p in encoder.parameters() if p.requires_grad)
     logger.info(f"Model created with {total_params} trainable parameters ({total_params * 4 / 1024:.2f} KB)")

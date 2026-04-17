@@ -1,12 +1,5 @@
 """
-CONTRASTIVE TRAINING - SimpleSleepNet
-======================================
-Questo file gestisce l'addestramento contrastivo dell'encoder (SimpleSleepNet).
-L'obiettivo è imparare rappresentazioni significative dei segnali EEG senza
-utilizzare le etichette (self-supervised learning).
-
-Filosofia: due views augmentate dello stesso segnale devono avere embeddings simili,
-mentre views di segnali diversi devono avere embeddings diversi.
+NESSUNA MODIFICA
 """
 
 import torch
@@ -22,38 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 def train_epoch(model, dataloader, optimizer, device, temperature, epoch):
-    """
-    ADDESTRA IL MODELLO PER UNA SINGOLA EPOCH
-    ========================================
-    
-    Cosa fa:
-        1. Prende batch di coppie contrastive (x_i, x_j)
-        2. Passa entrambi attraverso l'encoder per ottenere embeddings
-        3. Calcola la NT-Xent loss tra le due views
-        4. Aggiorna i pesi del modello (backpropagation)
-    
-    Parametri:
-    ----------
-    model : torch.nn.Module
-        L'encoder SimpleSleepNet da addestrare
-    dataloader : DataLoader
-        Fornisce batch di coppie (x_i, x_j) - due views augmentate
-    optimizer : torch.optim.Optimizer
-        Ottimizzatore (es. Adam, AdamW)
-    device : str
-        'cuda', 'mps', o 'cpu' - dove eseguire i calcoli
-    temperature : float
-        Parametro di temperatura per la NT-Xent loss.
-        Valori tipici: 0.07, 0.1, 0.5.
-        Più è basso, più le predizioni sono "sharp" (discriminative)
-    epoch : int
-        Numero dell'epoca corrente (per logging)
-    
-    Returns:
-    --------
-    average_loss : float
-        Loss media su tutti i batch dell'epoca
-    """
+
     tensorboard_logger = get_tensorboard_logger()
     
     # Modalità training (attiva dropout, batch norm, etc.)
@@ -113,29 +75,13 @@ def train_epoch(model, dataloader, optimizer, device, temperature, epoch):
 
 
 def save_model(model, save_path):
-    """
-    SALVA IL MODELLO SU DISCO
-    ========================
-    
-    Salva solo i pesi (state_dict), non l'architettura completa.
-    Questo permette di ricaricare il modello in seguito.
-    """
+
     torch.save(model.state_dict(), save_path)
     logger.info("Saved best model to %s", save_path)
 
 
 def compute_validation_loss(model, dataloader, device, temperature):
-    """
-    CALCOLA LA LOSS SUL VALIDATION SET
-    ===================================
-    
-    Differenza rispetto al training:
-        - model.eval(): disattiva dropout e batch norm
-        - torch.no_grad(): disabilita il calcolo dei gradienti (risparmia memoria)
-        - Non chiama .backward() o .step()
-    
-    Usata per monitorare l'overfitting e decidere quando fermare l'addestramento.
-    """
+
     model.eval()  # Modalità valutazione (dropout disattivato)
     total_loss = 0.0
     
@@ -164,42 +110,7 @@ def compute_validation_loss(model, dataloader, device, temperature):
 def train_contrastive_model(model, dataloader, optimizer, device='cuda', num_epochs=5, 
                             temperature=0.1, val_dataloader=None, check_interval=50, 
                             min_improvement=0.01, best_model_path='best_encoder.pth'):
-    """
-    LOOP PRINCIPALE DI ADDESTRAMENTO CONTRASTIVO
-    =============================================
     
-    Questa funzione coordina l'addestramento per multiple epoche,
-    gestisce la validazione, l'early stopping e il salvataggio del miglior modello.
-    
-    Flow:
-        1. Per ogni epoca: chiama train_epoch()
-        2. Ogni 'check_interval' epoche: calcola validation loss
-        3. Se validation loss migliora: salva il modello
-        4. Se non migliora per 'check_interval' epoche: early stopping
-    
-    Parametri:
-    ----------
-    model : SimpleSleepNet
-        L'encoder da addestrare
-    dataloader : DataLoader
-        Dataset di training con coppie contrastive
-    optimizer : Optimizer
-        Ottimizzatore (Adam, AdamW, SGD, ...)
-    device : str
-        'cuda', 'mps', o 'cpu'
-    num_epochs : int
-        Numero massimo di epoche
-    temperature : float
-        Parametro temperatura per NT-Xent loss
-    val_dataloader : DataLoader, optional
-        Dataset di validazione (se None, salta validazione)
-    check_interval : int
-        Ogni quante epoche fare validazione
-    min_improvement : float
-        Miglioramento minimo per considerare un progresso significativo
-    best_model_path : str
-        Dove salvare il miglior modello
-    """
     tensorboard_logger = get_tensorboard_logger()
     
     # GESTIONE DEVICE

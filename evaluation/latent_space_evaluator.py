@@ -1,3 +1,10 @@
+"""
+MODIFICATO
+
+n_clusters=2
+
+"""
+
 import os
 import warnings
 from collections import defaultdict
@@ -329,7 +336,7 @@ class EmbeddingVisualizer:
                 logger.error(f"Error visualizing embeddings for {method}: {e}")
 
 class LatentSpaceEvaluator:
-    def __init__(self, model, dataloader, device='cpu', umap_enabled=True, pca_enabled=True, tsne_enabled=True, visualize=True, compute_metrics=True, n_clusters=5, output_image_dir='visualizations', output_metrics_dir='metrics', experiment_num='default_experiment', visualization_fraction=0.5):
+    def __init__(self, model, dataloader, device='cpu', umap_enabled=True, pca_enabled=True, tsne_enabled=True, visualize=True, compute_metrics=True, n_clusters=2, output_image_dir='visualizations', output_metrics_dir='metrics', experiment_num='default_experiment', visualization_fraction=0.5):
         """
         Initializes the LatentSpaceEvaluator.
 

@@ -1,3 +1,13 @@
+"""
+MODIFICATO
+
+ LABELS = ["Normal", "Anomaly"] (prima era W, N1, N2, N3, REM)
+
+ class_labels = self.LABELS[:num_classes]
+
+ target_names=[f"Class {i}"...]	---> con ---->  target_names=class_labels
+"""
+
 import os
 import pandas as pd
 import numpy as np
@@ -11,18 +21,13 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 
 class ResultsSaver:
-    LABELS = ["W", "N1", "N2", "N3", "REM"]
+    # MODIFICA: Etichette per FordA (normale=0, anomalo=1)
+    LABELS = ["Normal", "Anomaly"]
     OVERALL_METRICS_FILENAME = 'overall_{}.csv'
     PER_CLASS_METRICS_FILENAME = 'perclass_{}.csv'
 
     def __init__(self, results_folder, experiment_num):
-        """
-        Initialize ResultsSaver with experiment-specific subfolder.
-        
-        Parameters:
-        - results_folder (str): Base results directory
-        - experiment_num (int): Experiment number for subfolder naming
-        """
+
         self.experiment_num = experiment_num
         
         # Crea sottocartella per l'esperimento
@@ -63,31 +68,34 @@ class ResultsSaver:
             tensorboard_logger.add_scalar(f'Recall/Class {i}', recall[i], self.experiment_num)
             tensorboard_logger.add_scalar(f'F1 Score/Class {i}', f1_score[i], self.experiment_num)
 
+        # Usa solo le prime num_classes etichette da LABELS
+        class_labels = self.LABELS[:num_classes]
+        
         # Compute confusion matrix
         cm = confusion_matrix(true_labels, predictions, labels=range(num_classes))
         cm_percentage = confusion_matrix(true_labels, predictions, labels=range(num_classes), normalize='true') * 100
         
         # Save confusion matrix numbers
-        cm_df = pd.DataFrame(cm, index=self.LABELS, columns=self.LABELS)
+        cm_df = pd.DataFrame(cm, index=class_labels, columns=class_labels)
         cm_df.to_csv(os.path.join(self.results_folder, f'confusion_matrix_{self.experiment_num}.csv'), index=True)
         logger.info(f"Confusion matrix saved to {os.path.join(self.results_folder, f'confusion_matrix_{self.experiment_num}.csv')}")
         
         # Save confusion matrix percentages
-        cm_pct_df = pd.DataFrame(cm_percentage, index=self.LABELS, columns=self.LABELS)
+        cm_pct_df = pd.DataFrame(cm_percentage, index=class_labels, columns=class_labels)
         cm_pct_df.to_csv(os.path.join(self.results_folder, f'confusion_matrix_percentage_{self.experiment_num}.csv'), index=True)
         logger.info(f"Confusion matrix percentages saved to {os.path.join(self.results_folder, f'confusion_matrix_percentage_{self.experiment_num}.csv')}")
 
         # Plot and log confusion matrix
         fig, ax = plt.subplots(figsize=(12, 10))
-        cm_df = pd.DataFrame(cm_percentage, index=self.LABELS, columns=self.LABELS)
+        cm_df = pd.DataFrame(cm_percentage, index=class_labels, columns=class_labels)
         cax = ax.matshow(cm_df, cmap='Blues')
         plt.colorbar(cax)
         ax.set_xlabel('Predicted Labels')
         ax.set_ylabel('True Labels')
         ax.set_xticks(range(num_classes))
         ax.set_yticks(range(num_classes))
-        ax.set_xticklabels(cm_df.columns)
-        ax.set_yticklabels(cm_df.index)
+        ax.set_xticklabels(class_labels)
+        ax.set_yticklabels(class_labels)
         
         for (i, j), val in np.ndenumerate(cm_percentage):
             ax.text(j, i, f"{val:.2f}%\n({cm[i, j]})", ha='center', va='center', color='black', fontsize=11)
@@ -104,7 +112,7 @@ class ResultsSaver:
             true_labels,
             predictions,
             labels=range(num_classes),
-            target_names=[f"Class {i}" for i in range(num_classes)],
+            target_names=class_labels,
             output_dict=True
         )
         class_metrics_df = pd.DataFrame(class_report).transpose()
