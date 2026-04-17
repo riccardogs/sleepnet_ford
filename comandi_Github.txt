@@ -1,6 +1,6 @@
 PER AGGIORNARE
 
-cd /Users/riccardosasu/Desktop/simplesleepnet
+cd /Users/riccardosasu/Desktop/sleepnet_ford
 git add .
 git commit -m "Aggiunto nuovo file di configurazione"
 git push
@@ -8,7 +8,7 @@ git push
 
 PER SCARICARE DA GITHUB
 
-cd /Users/riccardosasu/Desktop/simplesleepnet
+cd /Users/riccardosasu/Desktop/sleepnet_ford
 git pull
 
 
