@@ -1,15 +1,12 @@
 """
-VISUALIZZATORE DATASET EEG - Sleep-EDF
-=======================================
+VISUALIZZATORE DATASET FORDA 
+=================================================
 Questo script permette di:
-1. Elencare tutti i file .edf e .npz nella directory
-2. Visualizzare le shape dei file .npz (N_epochs, canali, campioni)
-3. Plottare un segnale EEG di un epoca scelta
-4. Mostrare la distribuzione delle etichette
+1. Visualizzare le shape del dataset FordA
+2. Plottare segnali normali vs anomali
+3. Mostrare la distribuzione delle etichette
 """
 
-import os
-import glob
 import numpy as np
 import matplotlib.pyplot as plt
 from collections import Counter
@@ -18,189 +15,174 @@ from collections import Counter
 # CONFIGURAZIONE
 # ============================================================================
 
-BASE_PATH = "/Users/riccardosasu/Desktop/simplesleepnet/dset/Sleep-EDF-2018"
-NPZ_PATH = os.path.join(BASE_PATH, "npz/Fpz-Cz")
+DATA_PATH = "/Users/riccardosasu/Desktop/sleepnet_ford/data/forda_real.npz"
 
-# Mappa etichette
-LABELS = {0: "W (Wake)", 1: "N1", 2: "N2", 3: "N3", 4: "REM"}
-COLORS = {0: "blue", 1: "orange", 2: "green", 3: "red", 4: "purple"}
+# Mappa etichette (FordA: 0=normale, 1=anomalo)
+LABELS = {0: "NORMALE (Healthy)", 1: "ANOMALO (Fault)"}
+COLORS = {0: "green", 1: "red"}
+
+# Frequenza di campionamento (stimata per FordA - 500 punti in ~1-2 secondi)
+SAMPLE_RATE = 250  # Hz (approssimativo)
 
 
 # ============================================================================
-# FUNZIONI PER I FILE NPZ
+# FUNZIONI DI CARICAMENTO
 # ============================================================================
 
-def list_npz_files(npz_path):
-    """Elenca tutti i file .npz e mostra le shape."""
-    npz_files = sorted(glob.glob(os.path.join(npz_path, "*.npz")))
+def load_forda_data(data_path=DATA_PATH):
+    """Carica il dataset FordA dal file .npz."""
+    data = np.load(data_path)
+    
+    X_train = data['X_train']
+    y_train = data['y_train']
+    X_val = data['X_val']
+    y_val = data['y_val']
+    X_test = data['X_test']
+    y_test = data['y_test']
+    
+    # Combina train e val per analisi completa
+    X = np.vstack([X_train, X_val])
+    y = np.hstack([y_train, y_val])
     
     print("=" * 80)
-    print(f"FILE .NPZ TROVATI: {len(npz_files)}")
+    print("DATASET FORDA - CARICATO")
     print("=" * 80)
+    print(f"\n📊 Shape dei dati:")
+    print(f"   Train: {X_train.shape}")
+    print(f"   Val:   {X_val.shape}")
+    print(f"   Test:  {X_test.shape}")
+    print(f"   Totale (train+val): {X.shape}")
     
-    for npz_file in npz_files:
-        basename = os.path.basename(npz_file)
-        with np.load(npz_file) as data:
-            # Stampa tutte le chiavi del file per capire la struttura
-            print(f"\n📁 {basename}")
-            print(f"   Chiavi nel file: {list(data.keys())}")
-            
-            for key in data.keys():
-                arr = data[key]
-                print(f"   {key}: shape = {arr.shape}, dtype = {arr.dtype}")
+    print(f"\n📊 Distribuzione etichette:")
+    print(f"   Normali (0): {sum(y==0)}")
+    print(f"   Anomali (1): {sum(y==1)}")
     
-    return npz_files
-
-
-def load_npz_subject(npz_path, subject_idx=None):
-    """Carica tutti i file di un soggetto specifico."""
-    npz_files = sorted(glob.glob(os.path.join(npz_path, "*.npz")))
-    
-    if subject_idx is not None:
-        subject_files = []
-        for f in npz_files:
-            basename = os.path.basename(f)
-            try:
-                subj = int(basename[3:5])
-                if subj == subject_idx:
-                    subject_files.append(f)
-            except:
-                continue
-        npz_files = subject_files
-    
-    if not npz_files:
-        print(f"Nessun file trovato per soggetto {subject_idx}")
-        return None, None
-    
-    all_x = []
-    all_y = []
-    
-    for npz_file in npz_files:
-        with np.load(npz_file) as data:
-            # Prova diverse possibili chiavi
-            if 'x' in data:
-                all_x.append(data['x'])
-            elif 'eeg' in data:
-                all_x.append(data['eeg'])
-            elif 'signal' in data:
-                all_x.append(data['signal'])
-            else:
-                # Prende il primo array disponibile
-                first_key = list(data.keys())[0]
-                all_x.append(data[first_key])
-            
-            if 'y' in data:
-                all_y.append(data['y'])
-            elif 'label' in data:
-                all_y.append(data['label'])
-    
-    x = np.concatenate(all_x, axis=0)
-    y = np.concatenate(all_y, axis=0)
-    
-    print(f"\n📊 Soggetto {subject_idx}: {len(npz_files)} file, {x.shape[0]} epoche totali")
-    print(f"   Shape x: {x.shape}")
-    print(f"   Shape y: {y.shape}")
-    
-    return x, y
+    return X, y, X_train, y_train, X_val, y_val, X_test, y_test
 
 
 # ============================================================================
 # FUNZIONI PER IL PLOT
 # ============================================================================
 
-def plot_epoch(x, y, epoch_idx, sfreq=100, title="EEG Signal"):
+def plot_signal(signal, label, title="FordA Signal"):
     """
-    Plotta un singolo epoca.
+    Plotta un singolo segnale FordA.
     """
-    # Gestisce diverse shape possibili
-    if len(x.shape) == 3:
-        signal = x[epoch_idx, 0, :]  # (N, canali, campioni)
-    elif len(x.shape) == 2:
-        signal = x[epoch_idx, :]  # (N, campioni)
-    else:
-        signal = x[epoch_idx]
-    
-    label = y[epoch_idx]
-    
-    # Durata in secondi (assumendo 100 Hz)
     n_samples = len(signal)
-    duration = n_samples / sfreq
+    duration = n_samples / SAMPLE_RATE
     time_axis = np.linspace(0, duration, n_samples)
     
     fig, ax = plt.subplots(figsize=(15, 5))
     
-    ax.plot(time_axis, signal, 'b-', linewidth=0.7)
+    color = COLORS.get(label, "blue")
+    ax.plot(time_axis, signal, color=color, linewidth=0.8)
     ax.set_xlabel('Tempo (secondi)')
-    ax.set_ylabel('Ampiezza (µV)')
-    ax.set_title(f'{title} - Epoca {epoch_idx} - {LABELS.get(label, label)}')
+    ax.set_ylabel('Ampiezza (unità normalizzate)')
+    ax.set_title(f'{title} - {LABELS.get(label, label)}')
     ax.grid(True, alpha=0.3)
     ax.set_xlim(0, duration)
     
     plt.tight_layout()
     plt.show()
     
-    print(f"Epoca {epoch_idx}: {LABELS.get(label, label)}")
-    print(f"   Min: {signal.min():.2f} µV")
-    print(f"   Max: {signal.max():.2f} µV")
-    print(f"   Media: {signal.mean():.2f} µV")
-    print(f"   Std: {signal.std():.2f} µV")
-    print(f"   Durata: {duration:.1f} secondi")
+    print(f"\n📊 Statistiche segnale:")
+    print(f"   Min: {signal.min():.4f}")
+    print(f"   Max: {signal.max():.4f}")
+    print(f"   Media: {signal.mean():.4f}")
+    print(f"   Std: {signal.std():.4f}")
+    print(f"   Durata: {duration:.2f} secondi")
     print(f"   Campioni: {n_samples}")
-    print(f"   Frequenza campionamento stimata: {n_samples/duration:.1f} Hz")
+    print(f"   Frequenza stimata: {n_samples/duration:.1f} Hz")
 
 
 def plot_label_distribution(y):
     """Plotta la distribuzione delle etichette."""
     label_counts = Counter(y)
     
-    fig, ax = plt.subplots(figsize=(10, 6))
+    fig, ax = plt.subplots(figsize=(8, 6))
     
     labels_names = [LABELS[i] for i in sorted(label_counts.keys())]
     counts = [label_counts[i] for i in sorted(label_counts.keys())]
     colors_list = [COLORS[i] for i in sorted(label_counts.keys())]
     
     bars = ax.bar(labels_names, counts, color=colors_list, edgecolor='black')
-    ax.set_xlabel('Stadi del sonno')
-    ax.set_ylabel('Numero di epoche')
-    ax.set_title('Distribuzione delle etichette nel dataset')
+    ax.set_xlabel('Classe')
+    ax.set_ylabel('Numero di campioni')
+    ax.set_title('Distribuzione delle classi nel dataset FordA')
     
     for bar, count in zip(bars, counts):
         ax.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 5,
                 str(count), ha='center', va='bottom')
     
-    plt.xticks(rotation=45)
     plt.tight_layout()
     plt.show()
     
-    print("\n📊 Distribuzione etichette:")
+    print("\n📊 Distribuzione classi:")
+    total = sum(counts)
     for label in sorted(label_counts.keys()):
         count = label_counts[label]
-        percent = count / len(y) * 100
-        print(f"   {LABELS[label]}: {count} epoche ({percent:.1f}%)")
+        percent = count / total * 100
+        print(f"   {LABELS[label]}: {count} campioni ({percent:.1f}%)")
 
 
-def plot_multiple_epochs(x, y, epoch_indices, sfreq=100):
-    """Plotta più epoche in una figura."""
-    n_plots = len(epoch_indices)
+def plot_normal_vs_anomaly(X, y):
+    """Confronta un segnale normale con uno anomalo."""
+    # Trova un indice normale e uno anomalo
+    normal_idx = np.where(y == 0)[0][0]
+    anomaly_idx = np.where(y == 1)[0][0]
+    
+    fig, axes = plt.subplots(2, 1, figsize=(15, 8))
+    
+    n_samples = X.shape[1]
+    duration = n_samples / SAMPLE_RATE
+    time_axis = np.linspace(0, duration, n_samples)
+    
+    # Segnale normale
+    axes[0].plot(time_axis, X[normal_idx], 'green', linewidth=0.8)
+    axes[0].set_ylabel('Ampiezza')
+    axes[0].set_title(f'NORMALE - {LABELS[0]}')
+    axes[0].grid(True, alpha=0.3)
+    axes[0].set_xlim(0, duration)
+    
+    # Segnale anomalo
+    axes[1].plot(time_axis, X[anomaly_idx], 'red', linewidth=0.8)
+    axes[1].set_xlabel('Tempo (secondi)')
+    axes[1].set_ylabel('Ampiezza')
+    axes[1].set_title(f'ANOMALO - {LABELS[1]}')
+    axes[1].grid(True, alpha=0.3)
+    axes[1].set_xlim(0, duration)
+    
+    plt.tight_layout()
+    plt.show()
+    
+    print("\n📊 Confronto statistico:")
+    print(f"\nNORMALE:")
+    print(f"   Min: {X[normal_idx].min():.4f}")
+    print(f"   Max: {X[normal_idx].max():.4f}")
+    print(f"   Std: {X[normal_idx].std():.4f}")
+    print(f"\nANOMALO:")
+    print(f"   Min: {X[anomaly_idx].min():.4f}")
+    print(f"   Max: {X[anomaly_idx].max():.4f}")
+    print(f"   Std: {X[anomaly_idx].std():.4f}")
+
+
+def plot_multiple_signals(X, y, indices, title="Segnali FordA"):
+    """Plotta più segnali in una figura."""
+    n_plots = len(indices)
     fig, axes = plt.subplots(n_plots, 1, figsize=(15, 4 * n_plots))
     
     if n_plots == 1:
         axes = [axes]
     
-    for i, epoch_idx in enumerate(epoch_indices):
-        if len(x.shape) == 3:
-            signal = x[epoch_idx, 0, :]
-        else:
-            signal = x[epoch_idx, :]
-        
-        label = y[epoch_idx]
-        n_samples = len(signal)
-        duration = n_samples / sfreq
-        time_axis = np.linspace(0, duration, n_samples)
-        
-        axes[i].plot(time_axis, signal, 'b-', linewidth=0.7)
-        axes[i].set_ylabel('µV')
-        axes[i].set_title(f'Epoca {epoch_idx} - {LABELS.get(label, label)}')
+    n_samples = X.shape[1]
+    duration = n_samples / SAMPLE_RATE
+    time_axis = np.linspace(0, duration, n_samples)
+    
+    for i, idx in enumerate(indices):
+        color = COLORS.get(y[idx], "blue")
+        axes[i].plot(time_axis, X[idx], color=color, linewidth=0.8)
+        axes[i].set_ylabel('Ampiezza')
+        axes[i].set_title(f'Campione {idx} - {LABELS.get(y[idx], y[idx])}')
         axes[i].grid(True, alpha=0.3)
         axes[i].set_xlim(0, duration)
     
@@ -210,48 +192,86 @@ def plot_multiple_epochs(x, y, epoch_indices, sfreq=100):
 
 
 # ============================================================================
+# ANALISI STATISTICA
+# ============================================================================
+
+def print_statistics(X, y):
+    """Stampa statistiche dettagliate del dataset."""
+    print("\n" + "=" * 80)
+    print("STATISTICHE DEL DATASET")
+    print("=" * 80)
+    
+    print(f"\n📊 Dimensioni:")
+    print(f"   Numero campioni: {X.shape[0]}")
+    print(f"   Lunghezza sequenza: {X.shape[1]} punti")
+    
+    print(f"\n📊 Statistiche globali:")
+    print(f"   Media globale: {X.mean():.4f}")
+    print(f"   Std globale: {X.std():.4f}")
+    print(f"   Min globale: {X.min():.4f}")
+    print(f"   Max globale: {X.max():.4f}")
+    
+    print(f"\n📊 Statistiche per classe:")
+    for label in [0, 1]:
+        mask = y == label
+        class_data = X[mask]
+        print(f"\n   {LABELS[label]}:")
+        print(f"      Media: {class_data.mean():.4f}")
+        print(f"      Std: {class_data.std():.4f}")
+        print(f"      Min: {class_data.min():.4f}")
+        print(f"      Max: {class_data.max():.4f}")
+
+
+# ============================================================================
 # MAIN
 # ============================================================================
 
 def main():
-    """Esegue l'analisi completa del dataset."""
+    """Esegue l'analisi completa del dataset FordA."""
     
     print("=" * 80)
-    print("VISUALIZZATORE DATASET SLEEP-EDF")
+    print("VISUALIZZATORE DATASET FORDA")
     print("=" * 80)
     
-    # 1. Elenca file NPZ e mostra shape
-    print("\n🔍 SCANSIONE FILE .NPZ...")
-    npz_files = list_npz_files(NPZ_PATH)
+    # 1. Carica il dataset
+    print("\n🔍 CARICAMENTO DATASET...")
+    X, y, X_train, y_train, X_val, y_val, X_test, y_test = load_forda_data()
     
-    # 2. Carica un soggetto specifico (es. soggetto 0)
+    # 2. Distribuzione etichette
     print("\n" + "=" * 80)
-    print("ANALISI SOGGETTO 0")
+    print("DISTRIBUZIONE CLASSI")
     print("=" * 80)
+    plot_label_distribution(y)
     
-    x, y = load_npz_subject(NPZ_PATH, subject_idx=4)   # modificare subject_idx per altri soggetti
+    # 3. Statistiche dettagliate
+    print_statistics(X, y)
     
-    if x is not None:
-        print(f"\n📊 Soggetto 0:")
-        print(f"   Totale epoche: {x.shape[0]}")
-        
-        # 3. Distribuzione etichette
-        plot_label_distribution(y)
-        
-        # 4. Plotta una epoca esempio
-        print("\n📈 PLOT EPOCA ESEMPIO...")
-        plot_epoch(x, y, epoch_idx=0, title="Soggetto 0 - Epoca 0")
-        
-        # 5. Plotta più epoche
-        print("\n📈 PLOT MULTIPLE EPOCHE...")
-        epochs_to_plot = []
-        for label in range(5):
-            indices = np.where(y == label)[0]
-            if len(indices) > 0:
-                epochs_to_plot.append(indices[0])
-        
-        if epochs_to_plot:
-            plot_multiple_epochs(x, y, epochs_to_plot[:5])
+    # 4. Confronto normale vs anomalo
+    print("\n" + "=" * 80)
+    print("CONFRONTO NORMALE vs ANOMALO")
+    print("=" * 80)
+    plot_normal_vs_anomaly(X, y)
+    
+    # 5. Esempi di segnali normali
+    print("\n" + "=" * 80)
+    print("ESEMPI DI SEGNALI NORMALI")
+    print("=" * 80)
+    normal_indices = np.where(y == 0)[0][:3]
+    plot_multiple_signals(X, y, normal_indices, title="Segnali Normali")
+    
+    # 6. Esempi di segnali anomali
+    print("\n" + "=" * 80)
+    print("ESEMPI DI SEGNALI ANOMALI")
+    print("=" * 80)
+    anomaly_indices = np.where(y == 1)[0][:3]
+    plot_multiple_signals(X, y, anomaly_indices, title="Segnali Anomali")
+    
+    # 7. Plot di un singolo segnale a scelta
+    print("\n" + "=" * 80)
+    print("ANALISI SINGOLO SEGNALE")
+    print("=" * 80)
+    sample_idx = 0
+    plot_signal(X[sample_idx], y[sample_idx], title=f"FordA - Campione {sample_idx}")
     
     print("\n✅ Analisi completata!")
 
