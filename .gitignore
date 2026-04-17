@@ -37,3 +37,4 @@ z/
 *.pdf
 *.zip
 report/
+*.ipynb
