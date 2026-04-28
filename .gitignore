@@ -14,9 +14,11 @@ dset/
 
 # Checkpoint e log
 checkpoints/
+checkpoints_ford/
 logs/
 runs/
 results/
+results_ford/
 
 # File nascosti
 .DS_Store
