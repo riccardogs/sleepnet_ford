@@ -3,6 +3,9 @@ import numpy as np
 
 print(' Scaricando FordA originale con aeon...')
 
+
+# per FordB basta mettere B
+
 X, y = load_classification('FordA')
 
 print(f'✅ Dataset caricato: {X.shape}')

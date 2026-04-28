@@ -2,7 +2,7 @@ PER AGGIORNARE
 
 cd /Users/riccardosasu/Desktop/sleepnet_ford
 git add .
-git commit -m "Modifiche generali, modello funzionante"
+git commit -m "Modifiche generali"
 git push
 
 
@@ -18,3 +18,47 @@ source venv_ford/bin/activate
 
 
 python main.py --config configs/default/config.json
+
+
+
+
+
+FordA sono vibrazioni del motore 1 assiale con poco rumore, accelleromentro
+
+ 
+
+https://www.timeseriesclassification.com/description.php?Dataset=FordB
+
+This data was originally used in a competition in the IEEE World Congress on Computational Intelligence, 2008. 
+The classification problem is to diagnose whether a certain symptom exists or does not exist in an automotive 
+subsystem. Each case consists of 500 measurements of engine noise and a classification. There are two separate 
+problems: For FordA the Train and test data set were collected in typical operating conditions, with minimal 
+noise contamination.
+
+
+oppure 
+
+
+This data was originally used in a competition in the IEEE World Congress on Computational Intelligence, 2008. 
+The classification problem is to diagnose whether a certain symptom exists or does not exist in an automotive 
+subsystem. Each case consists of 500 measurements of engine noise and a classification. There are two separate 
+problems: For FordA the Train and test data set were collected in typical operating conditions, with minimal 
+noise contamination.
+
+
+
+
+FordB 
+
+This data was originally used in a competition in the IEEE World Congress on Computational Intelligence, 2008. 
+The classification problem is to diagnose whether a certain symptom exists or does not exist in an automotive 
+subsystem. Each case consists of 500 measurements of engine noise and a classification. There are two separate 
+problems: For FordB the training data were collected in typical operating conditions, but the test data samples 
+were collected under noisy conditions.
+
+
+
+NASA Bearing Dataset
+
+https://www.kaggle.com/datasets/vinayak123tyagi/bearing-dataset
+

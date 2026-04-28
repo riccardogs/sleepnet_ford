@@ -3,7 +3,7 @@
   "results_folder": "results_ford",
   "num_workers": 4,
   "dataset": {
-    "dset_path": "data/forda_originale.npz",
+    "dset_path": "data/fordb_ready.npz",
     "max_files": 4921
   },
   "pretraining_params": {
@@ -36,7 +36,7 @@
     "min_improvement": 0.005,
     "best_model_pth": "checkpoints_ford/classifier/classifier_"
   },
-  "experiment_num": 2003,
+  "experiment_num": 2004,
   "augmentations": {
     "RandomZeroMasking": {
       "p": 0.8,
