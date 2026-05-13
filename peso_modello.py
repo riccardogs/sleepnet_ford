@@ -2,8 +2,8 @@ import torch
 import os
 
 # PATH DEI MODELLI FORD
-encoder_path = "checkpoints_ford/encoder/encoder_2003.pth"
-classifier_path = "checkpoints_ford/classifier/classifier_2003.pth"
+encoder_path = "checkpoints_ford/encoder/encoder_2005.pth"
+classifier_path = "checkpoints_ford/classifier/classifier_2005.pth"
 
 print("="*50)
 print("ANALISI MODELLI FORD")

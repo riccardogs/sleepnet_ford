@@ -1,9 +1,9 @@
 {
   "seed": 42,
   "results_folder": "results_ford",
-  "num_workers": 4,
+  "num_workers": 8,
   "dataset": {
-    "dset_path": "data/fordb_ready.npz",
+    "dset_path": "data/forda_originale.npz",
     "max_files": 4921
   },
   "pretraining_params": {
@@ -36,11 +36,30 @@
     "min_improvement": 0.005,
     "best_model_pth": "checkpoints_ford/classifier/classifier_"
   },
-  "experiment_num": 2004,
+  "experiment_num": 2007,
+  
   "augmentations": {
-    "RandomZeroMasking": {
-      "p": 0.8,
-      "range": [100, 250]
-    }
+  "TailoredMixup": {
+    "p": 0.6,
+    "fs": 100,
+    "beta": 0.3
+  },
+  "TimeWarping": {
+    "p": 0.6,
+    "n_segments": 4,
+    "scale_range": [0.6, 1.8]
+  },
+  "Permutation": {
+    "p": 0.6,
+    "n_segments": 4
+  },
+  "RandomZeroMasking": {
+    "p": 0.6,
+    "range": [80, 200]
+  },
+  "CutoutResize": {
+    "p": 0.6,
+    "n_segments": 4
   }
+ }
 }

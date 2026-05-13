@@ -34,7 +34,7 @@ def load_forda_data(data_path=DATA_PATH):
     data = np.load(data_path)
     
     X = data['X']  # shape: (4921, 1, 500)
-    y = data['y']  # classi: '-1' e '1'
+    y = data['y']  # classi: '-1' e '1' (stringhe)
     
     # Converti y da stringa a intero
     y = y.astype(int)
@@ -61,9 +61,7 @@ def load_forda_data(data_path=DATA_PATH):
 # ============================================================================
 
 def plot_signal(signal, label, title="FordA Signal"):
-    """
-    Plotta un singolo segnale FordA.
-    """
+    """Plotta un singolo segnale FordA."""
     n_samples = len(signal)
     duration = n_samples / SAMPLE_RATE
     time_axis = np.linspace(0, duration, n_samples)
@@ -97,6 +95,7 @@ def plot_label_distribution(y):
     
     fig, ax = plt.subplots(figsize=(8, 6))
     
+    # Ordina le chiavi (-1, 1)
     labels_names = [LABELS[i] for i in sorted(label_counts.keys())]
     counts = [label_counts[i] for i in sorted(label_counts.keys())]
     colors_list = [COLORS[i] for i in sorted(label_counts.keys())]
@@ -123,7 +122,7 @@ def plot_label_distribution(y):
 
 def plot_normal_vs_anomaly(X, y):
     """Confronta un segnale normale con uno anomalo."""
-    # Trova un indice normale e uno anomalo
+    # Trova un indice normale (-1) e uno anomalo (1)
     normal_idx = np.where(y == -1)[0][0]
     anomaly_idx = np.where(y == 1)[0][0]
     
@@ -152,11 +151,11 @@ def plot_normal_vs_anomaly(X, y):
     plt.show()
     
     print("\n📊 Confronto statistico:")
-    print(f"\nNORMALE:")
+    print(f"\nNORMALE (classe -1):")
     print(f"   Min: {X[normal_idx].min():.4f}")
     print(f"   Max: {X[normal_idx].max():.4f}")
     print(f"   Std: {X[normal_idx].std():.4f}")
-    print(f"\nANOMALO:")
+    print(f"\nANOMALO (classe 1):")
     print(f"   Min: {X[anomaly_idx].min():.4f}")
     print(f"   Max: {X[anomaly_idx].max():.4f}")
     print(f"   Std: {X[anomaly_idx].std():.4f}")
@@ -226,7 +225,7 @@ def main():
     """Esegue l'analisi completa del dataset FordA originale."""
     
     print("=" * 80)
-    print("VISUALIZZATORE DATASET FORDA - ORIGINALE")
+    print("VISUALIZZATORE DATASET FORDA - ORIGINALE (classi -1/1)")
     print("=" * 80)
     
     # 1. Carica il dataset
@@ -250,24 +249,24 @@ def main():
     
     # 5. Esempi di segnali normali
     print("\n" + "=" * 80)
-    print("ESEMPI DI SEGNALI NORMALI")
+    print("ESEMPI DI SEGNALI NORMALI (classe -1)")
     print("=" * 80)
     normal_indices = np.where(y == -1)[0][:3]
-    plot_multiple_signals(X, y, normal_indices, title="Segnali Normali Originali")
+    plot_multiple_signals(X, y, normal_indices, title="Segnali Normali")
     
     # 6. Esempi di segnali anomali
     print("\n" + "=" * 80)
-    print("ESEMPI DI SEGNALI ANOMALI")
+    print("ESEMPI DI SEGNALI ANOMALI (classe 1)")
     print("=" * 80)
     anomaly_indices = np.where(y == 1)[0][:3]
-    plot_multiple_signals(X, y, anomaly_indices, title="Segnali Anomali Originali")
+    plot_multiple_signals(X, y, anomaly_indices, title="Segnali Anomali")
     
     # 7. Plot di un singolo segnale a scelta
     print("\n" + "=" * 80)
     print("ANALISI SINGOLO SEGNALE")
     print("=" * 80)
     sample_idx = 0
-    plot_signal(X[sample_idx], y[sample_idx], title=f"FordA Originale - Campione {sample_idx}")
+    plot_signal(X[sample_idx], y[sample_idx], title=f"FordA - Campione {sample_idx}")
     
     print("\n✅ Analisi completata!")
 

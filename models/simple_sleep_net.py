@@ -325,42 +325,42 @@ class SimpleSleepNet(nn.Module):
             # BLOCCO 1: 500 → ~125 campioni
             nn.Conv1d(
                 in_channels=1,
-                out_channels=16,
-                kernel_size=16,
-                stride=4,
-                padding=7,
-                dilation=1,
-                bias=False
-            ),
-            nn.BatchNorm1d(16),
-            Mish(),
-            self.dropout,
-            
-            # BLOCCO 2: ~125 → ~62 campioni
-            nn.Conv1d(
-                in_channels=16,
                 out_channels=32,
-                kernel_size=8,
-                stride=2,
-                padding=5,
-                dilation=2,
+                kernel_size=64,
+                stride=8,
+                padding=63,
+                dilation=1,
                 bias=False
             ),
             nn.BatchNorm1d(32),
             Mish(),
             self.dropout,
             
-            # BLOCCO 3: ~62 → ~31 campioni
+            # BLOCCO 2: ~125 → ~62 campioni
             nn.Conv1d(
                 in_channels=32,
                 out_channels=64,
-                kernel_size=4,
-                stride=2,
-                padding=4,
-                dilation=4,
+                kernel_size=32,
+                stride=4,
+                padding=62,
+                dilation=2,
                 bias=False
             ),
             nn.BatchNorm1d(64),
+            Mish(),
+            self.dropout,
+            
+            # BLOCCO 3: ~62 → ~31 campioni
+            nn.Conv1d(
+                in_channels=64,
+                out_channels=128,
+                kernel_size=16,
+                stride=2,
+                padding=60,
+                dilation=4,
+                bias=False
+            ),
+            nn.BatchNorm1d(128),
             Mish(),
             self.dropout,
         )
@@ -374,7 +374,7 @@ class SimpleSleepNet(nn.Module):
         # Questo strato è talvolta chiamato "projection head" nel contrastive learning
         # ====================================================================
         self.fc = nn.Sequential(
-            nn.Linear(64, self.latent_dim),        # Proiezione lineare
+            nn.Linear(128, self.latent_dim),        # Proiezione lineare
             nn.BatchNorm1d(self.latent_dim),        # Normalizzazione
             Mish(),                                 # Attivazione
             self.dropout                            # Regolarizzazione
