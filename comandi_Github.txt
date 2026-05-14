@@ -12,6 +12,10 @@ cd /Users/riccardosasu/Desktop/sleepnet_ford
 git pull
 
 
+# Questo BUTTA VIA tutte le modifiche NON committate
+# e torna esattamente all'ultimo commit (quello funzionante)
+git reset --hard HEAD
+
 
 cd /Users/riccardosasu/Desktop/sleepnet_ford
 source venv_ford/bin/activate
