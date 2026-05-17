@@ -2,19 +2,22 @@
   "seed": 42,
   "results_folder": "results_ford",
   "num_workers": 8,
+
   "dataset": {
     "dset_path": "data/forda_originale.npz",
+    "labeled_fraction": 0.05,
     "max_files": 4921
   },
+  
   "pretraining_params": {
     "batch_size": 256,
-    "temperature": 0.1,
+    "temperature": 0.05,
     "dropout_rate": 0.2,
     "latent_dim": 128,
     "learning_rate": 0.001,
     "max_epochs": 10,
     "check_interval": 2,
-    "min_improvement": 0.01,
+    "min_improvement": 0.0001,
     "best_model_pth": "checkpoints_ford/encoder/encoder_"
   },
   "latent_space_params": {
@@ -33,10 +36,10 @@
     "max_epochs": 5,
     "dropout_rate": 0.5,
     "check_interval": 1,
-    "min_improvement": 0.005,
+    "min_improvement": 0.0005,
     "best_model_pth": "checkpoints_ford/classifier/classifier_"
   },
-  "experiment_num": 2007,
+  "experiment_num": 2009,
   
   "augmentations": {
   "TailoredMixup": {

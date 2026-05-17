@@ -132,6 +132,8 @@ def train_epoch(encoder, classifier, train_loader, criterion, optimizer, device,
         tensorboard_logger.add_scalar('Train/Loss', avg_train_loss, epoch)
         tensorboard_logger.add_scalar('Train/Epoch_Duration', epoch_duration, epoch)
         
+        print(f"DEBUG: y_train unique: {torch.unique(labels)}")
+        
         return avg_train_loss, epoch_duration
         
     except Exception as e:

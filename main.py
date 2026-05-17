@@ -204,32 +204,46 @@ def prepare_datasets(config, logger):
 
 
 def prepare_datasets(config, logger):
-    """
-    Prepara i dataset e i dataloader per il training supervisionato.
-    """
     BATCH_SIZE = config["pretraining_params"]["batch_size"]
     NUM_WORKERS = config["num_workers"]
-    
-    # Carica i dati FordA
-    from utils.forda_loader import FordADataLoader
-    loader = FordADataLoader(config['dataset']['dset_path'])
-    data = loader.load_data()
-    
-    # Adatta alla struttura che SimpleSleepNet si aspetta
-    eeg_data = {
-        'train': data['train'],   # (X_train, y_train)
-        'test': data['test']      # (X_test, y_test)
-    }
-    logger.info("Loaded train and test sets from FordA")
 
-    # Crea dataset supervisionati (segnale, label)
-    train_dataset = SupervisedEEGDataset(eeg_data['train'])
+    labeled_fraction = config["dataset"].get("labeled_fraction", 1.0)
+
+    from utils.forda_loader import FordADataLoader
+    loader = FordADataLoader(config['dataset']['dset_path'], labeled_fraction=labeled_fraction)
+    data = loader.load_data()
+
+
+    print("\n" + "="*60)
+    print("RIEPILOGO SPLITA DATI PER OGNI FASE:")
+    print("="*60)
+    print(f"   Contrastive learning (encoder): {data['train_all'][0].shape[0]} campioni (tutti, senza etichette)")
+    print(f"   Classificatore (supervisionato): {data['train_labeled'][0].shape[0]} campioni (con etichetta)")
+    print(f"   Validation: {data['val'][0].shape[0]} campioni")
+    print(f"   Test: {data['test'][0].shape[0]} campioni")
+    print("="*60 + "\n")
+
+
+
+    print(f"\n🔍 DIAGNOSTICA ETICHETTE DOPO SPLIT:")
+    print(f"   Train_labeled: classe 0={sum(data['train_labeled'][1]==0)}, classe 1={sum(data['train_labeled'][1]==1)}")
+    print(f"   Train_all: classe 0={sum(data['train_all'][1]==0)}, classe 1={sum(data['train_all'][1]==1)}")
+   
+    # SPLIT DEI DATI
+
+    eeg_data = {
+        'contrastive_train': data['train_all'],   # per contrastive learning
+        'train_labeled': data['train_labeled'],   # per classificatore
+        'val': data['val'],
+        'test': data['test']
+    }
+
+    train_dataset = SupervisedEEGDataset(eeg_data['train_labeled'])
     test_dataset = SupervisedEEGDataset(eeg_data['test'])
 
     train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS)
     test_loader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=False, num_workers=NUM_WORKERS)
-    logger.info("Supervised datasets and dataloaders created.")
-    
+
     return eeg_data, train_loader, test_loader
 
 
@@ -267,8 +281,8 @@ def pretrain_contrastive_model(config, eeg_data, device, logger, tensorboard_log
     # Carica le augmentations dal config (es. TimeWarping, RandomNoise, etc.)
     augmentations = load_augmentations_from_config(config=config)
 
-    # Dataset di training contrastivo (genera coppie di views augmentate)
-    train_contrastive_dataset = ContrastiveEEGDataset(eeg_data['train'], augmentations=augmentations)
+    # QUA MODIFICA: usa eeg_data['contrastive_train'] invece di eeg_data['train']
+    train_contrastive_dataset = ContrastiveEEGDataset(eeg_data['contrastive_train'], augmentations=augmentations)
     train_contrastive_loader = DataLoader(
         train_contrastive_dataset,
         batch_size=BATCH_SIZE,
@@ -337,6 +351,8 @@ def pretrain_contrastive_model(config, eeg_data, device, logger, tensorboard_log
         raise
 
     return encoder
+
+
 
 
 
